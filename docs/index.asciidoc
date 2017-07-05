@@ -1,0 +1,5 @@
+= Prometheusbeat Docs
+
+Welcome to the Prometheusbeat documentation.
+
+

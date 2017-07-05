@@ -1,0 +1,74 @@
+package prometheus
+
+import (
+	"io/ioutil"
+	"log"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/elastic/beats/libbeat/common"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/snappy"
+
+	"github.com/prometheus/prometheus/storage/remote"
+
+	"github.com/infonova/prometheusbeat/config"
+)
+
+type PrometheusServer struct {
+	config           config.Config
+	prometheusEvents chan common.MapStr
+}
+
+func NewPrometheusServer(cfg config.Config) *PrometheusServer {
+	promSrv := &PrometheusServer{
+		config: cfg,
+	}
+
+	return promSrv
+}
+
+func (promSrv *PrometheusServer) Start(events chan common.MapStr) {
+	promSrv.prometheusEvents = events
+
+	http.HandleFunc(promSrv.config.Context, promSrv.handlePrometheus)
+	log.Fatal(http.ListenAndServe(promSrv.config.Listen, nil))
+}
+
+func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http.Request) {
+
+	reqBuf, err := ioutil.ReadAll(snappy.NewReader(r.Body))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var req remote.WriteRequest
+	if err := proto.Unmarshal(reqBuf, &req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	for _, ts := range req.Timeseries {
+		jsonMap := map[string]interface{}{}
+
+		for _, l := range ts.Labels {
+			// field names with _ are not supported
+			fieldName := strings.Replace(l.Name, "_", "", -1)
+			jsonMap[fieldName] = l.Value
+		}
+
+		for _, s := range ts.Samples {
+			jsonMap["value"] = s.Value
+			jsonMap["@timestamp"] = common.Time(time.Unix(0, s.TimestampMs*1000000))
+		}
+
+		promSrv.prometheusEvents <- jsonMap
+	}
+}
+
+func (promSrv *PrometheusServer) Shutdown() {
+	close(promSrv.prometheusEvents)
+}

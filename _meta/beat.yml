@@ -1,0 +1,7 @@
+################### Prometheusbeat Configuration Example #########################
+
+############################# Prometheusbeat ######################################
+
+prometheusbeat:
+  listen: ":8080"
+  context: "/prometheus"

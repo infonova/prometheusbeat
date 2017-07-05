@@ -1,0 +1,10 @@
+- key: prometheusbeat
+  title: prometheusbeat
+  description:
+  fields:
+    - name: name
+      type: keyword
+      required: false
+    - name: value
+      type: double
+      required: false

@@ -1,0 +1,9 @@
+/.idea
+/build
+
+.DS_Store
+/prometheusbeat
+/prometheusbeat.test
+*.pyc
+
+tags
