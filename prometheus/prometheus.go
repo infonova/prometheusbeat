@@ -39,10 +39,27 @@ func (promSrv *PrometheusServer) Start(events chan common.MapStr) {
 
 func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http.Request) {
 
-	reqBuf, err := ioutil.ReadAll(snappy.NewReader(r.Body))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	var reqBuf []byte
+	var err error
+	// Handle breaking change between Prometheus versions
+	if promSrv.config.Version == 1 {
+		reqBuf, err = ioutil.ReadAll(snappy.NewReader(r.Body))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		compressed, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		reqBuf, err = snappy.Decode(nil, compressed)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	var req remote.WriteRequest
