@@ -38,10 +38,12 @@ Example Prometheusbeat event:
     "name": "virtmachine",
     "version": "5.4.4"
   },
-  "instance": "localhost:9090",
-  "job": "prometheus",
-  "monitor": "codelab-monitor",
-  "name": "process_open_fds",
+  "labels": {
+    "instance": "localhost:9090",
+    "job": "prometheus",
+    "monitor": "codelab-monitor",
+    "name": "scrape_samples_post_metric_relabeling"
+  },
   "type": "prometheusbeat",
   "value": 26.000000
 }

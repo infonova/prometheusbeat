@@ -69,20 +69,21 @@ func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http
 	}
 
 	for _, ts := range req.Timeseries {
-		jsonMap := map[string]interface{}{}
-
+		event := map[string]interface{}{}
+		labels := map[string]interface{}{}
 		for _, l := range ts.Labels {
 			// field names with _ are not supported
 			fieldName := strings.Replace(l.Name, "_", "", -1)
-			jsonMap[fieldName] = l.Value
+			labels[fieldName] = l.Value
 		}
+		event["labels"] = labels
 
 		for _, s := range ts.Samples {
-			jsonMap["value"] = s.Value
-			jsonMap["@timestamp"] = common.Time(time.Unix(0, s.TimestampMs*1000000))
+			event["value"] = s.Value
+			event["@timestamp"] = common.Time(time.Unix(0, s.TimestampMs*1000000))
 		}
 
-		promSrv.prometheusEvents <- jsonMap
+		promSrv.prometheusEvents <- event
 	}
 }
 
