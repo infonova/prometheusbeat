@@ -2,7 +2,7 @@ package cluster_health
 
 import (
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
@@ -21,9 +21,10 @@ var (
 )
 
 func init() {
-	if err := mb.Registry.AddMetricSet("ceph", "cluster_health", New, hostParser); err != nil {
-		panic(err)
-	}
+	mb.Registry.MustAddMetricSet("ceph", "cluster_health", New,
+		mb.WithHostParser(hostParser),
+		mb.DefaultMetricSet(),
+	)
 }
 
 type MetricSet struct {
@@ -32,9 +33,12 @@ type MetricSet struct {
 }
 
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	logp.Warn("BETA: The ceph cluster_health metricset is beta")
+	cfgwarn.Beta("The ceph cluster_health metricset is beta")
 
-	http := helper.NewHTTP(base)
+	http, err := helper.NewHTTP(base)
+	if err != nil {
+		return nil, err
+	}
 	http.SetHeader("Accept", "application/json")
 
 	return &MetricSet{
@@ -44,7 +48,6 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 }
 
 func (m *MetricSet) Fetch() (common.MapStr, error) {
-
 	content, err := m.HTTP.FetchContent()
 	if err != nil {
 		return nil, err

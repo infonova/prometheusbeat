@@ -2,7 +2,7 @@ package pool_disk
 
 import (
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
@@ -21,9 +21,10 @@ var (
 )
 
 func init() {
-	if err := mb.Registry.AddMetricSet("ceph", "pool_disk", New, hostParser); err != nil {
-		panic(err)
-	}
+	mb.Registry.MustAddMetricSet("ceph", "pool_disk", New,
+		mb.WithHostParser(hostParser),
+		mb.DefaultMetricSet(),
+	)
 }
 
 type MetricSet struct {
@@ -32,9 +33,12 @@ type MetricSet struct {
 }
 
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	logp.Warn("EXPERIMENTAL: The ceph pool_disk metricset is experimental")
+	cfgwarn.Experimental("The ceph pool_disk metricset is experimental")
 
-	http := helper.NewHTTP(base)
+	http, err := helper.NewHTTP(base)
+	if err != nil {
+		return nil, err
+	}
 	http.SetHeader("Accept", "application/json")
 
 	return &MetricSet{
@@ -44,7 +48,6 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 }
 
 func (m *MetricSet) Fetch() ([]common.MapStr, error) {
-
 	content, err := m.HTTP.FetchContent()
 
 	if err != nil {

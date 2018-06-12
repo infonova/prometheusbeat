@@ -1,0 +1,6 @@
+{
+  "fieldFormatMap": "{}",
+  "fields": "[{\"aggregatable\":true,\"analyzed\":false,\"count\":0,\"doc_values\":true,\"indexed\":true,\"name\":\"name\",\"scripted\":false,\"searchable\":true,\"type\":\"string\"},{\"aggregatable\":true,\"analyzed\":false,\"count\":0,\"doc_values\":true,\"indexed\":true,\"name\":\"value\",\"scripted\":false,\"searchable\":true},{\"aggregatable\":true,\"analyzed\":false,\"count\":0,\"doc_values\":true,\"indexed\":true,\"name\":\"@timestamp\",\"scripted\":false,\"searchable\":true,\"type\":\"date\"},{\"aggregatable\":false,\"analyzed\":false,\"count\":0,\"doc_values\":false,\"indexed\":false,\"name\":\"_id\",\"scripted\":false,\"searchable\":false,\"type\":\"string\"},{\"aggregatable\":true,\"analyzed\":false,\"count\":0,\"doc_values\":false,\"indexed\":false,\"name\":\"_type\",\"scripted\":false,\"searchable\":true,\"type\":\"string\"},{\"aggregatable\":false,\"analyzed\":false,\"count\":0,\"doc_values\":false,\"indexed\":false,\"name\":\"_index\",\"scripted\":false,\"searchable\":false,\"type\":\"string\"},{\"aggregatable\":false,\"analyzed\":false,\"count\":0,\"doc_values\":false,\"indexed\":false,\"name\":\"_score\",\"scripted\":false,\"searchable\":false,\"type\":\"number\"}]",
+  "timeFieldName": "@timestamp",
+  "title": "prometheusbeat-*"
+}

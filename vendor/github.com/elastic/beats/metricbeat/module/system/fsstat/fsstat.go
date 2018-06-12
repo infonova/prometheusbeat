@@ -3,6 +3,8 @@
 package fsstat
 
 import (
+	"strings"
+
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
@@ -15,20 +17,34 @@ import (
 var debugf = logp.MakeDebug("system-fsstat")
 
 func init() {
-	if err := mb.Registry.AddMetricSet("system", "fsstat", New, parse.EmptyHostParser); err != nil {
-		panic(err)
-	}
+	mb.Registry.MustAddMetricSet("system", "fsstat", New,
+		mb.WithHostParser(parse.EmptyHostParser),
+	)
 }
 
 // MetricSet for fetching a summary of filesystem stats.
 type MetricSet struct {
 	mb.BaseMetricSet
+	config filesystem.Config
 }
 
 // New creates and returns a new instance of MetricSet.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	var config filesystem.Config
+	if err := base.Module().UnpackConfig(&config); err != nil {
+		return nil, err
+	}
+
+	if config.IgnoreTypes == nil {
+		config.IgnoreTypes = filesystem.DefaultIgnoredTypes()
+	}
+	if len(config.IgnoreTypes) > 0 {
+		logp.Info("Ignoring filesystem types: %s", strings.Join(config.IgnoreTypes, ", "))
+	}
+
 	return &MetricSet{
 		BaseMetricSet: base,
+		config:        config,
 	}, nil
 }
 
@@ -40,9 +56,12 @@ func (m *MetricSet) Fetch() (common.MapStr, error) {
 		return nil, errors.Wrap(err, "filesystem list")
 	}
 
+	if len(m.config.IgnoreTypes) > 0 {
+		fss = filesystem.Filter(fss, filesystem.BuildTypeFilter(m.config.IgnoreTypes...))
+	}
+
 	// These values are optional and could also be calculated by Kibana
 	var totalFiles, totalSize, totalSizeFree, totalSizeUsed uint64
-	dict := map[string]bool{}
 
 	for _, fs := range fss {
 		stat, err := filesystem.GetFileSystemStat(fs)
@@ -52,18 +71,10 @@ func (m *MetricSet) Fetch() (common.MapStr, error) {
 		}
 		logp.Debug("fsstat", "filesystem: %s total=%d, used=%d, free=%d", stat.Mount, stat.Total, stat.Used, stat.Free)
 
-		if _, ok := dict[stat.Mount]; ok {
-			// ignore filesystem with the same mounting point
-			continue
-		}
-
 		totalFiles += stat.Files
 		totalSize += stat.Total
 		totalSizeFree += stat.Free
 		totalSizeUsed += stat.Used
-
-		dict[stat.Mount] = true
-
 	}
 
 	return common.MapStr{
@@ -72,7 +83,7 @@ func (m *MetricSet) Fetch() (common.MapStr, error) {
 			"used":  totalSizeUsed,
 			"total": totalSize,
 		},
-		"count":       len(dict),
+		"count":       len(fss),
 		"total_files": totalFiles,
 	}, nil
 }

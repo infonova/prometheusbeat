@@ -12,7 +12,6 @@ import (
 )
 
 func TestGlobWatcher(t *testing.T) {
-
 	// Create random temp directory
 	id := strconv.Itoa(rand.New(rand.NewSource(int64(time.Now().Nanosecond()))).Int())
 	dir, err := ioutil.TempDir("", id)
@@ -36,7 +35,6 @@ func TestGlobWatcher(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, changed)
 
-	files, changed, err = gcd.Scan()
 	files, changed, err = gcd.Scan()
 	assert.Equal(t, 2, len(files))
 	assert.NoError(t, err)

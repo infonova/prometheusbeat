@@ -294,6 +294,10 @@ func (self *Swap) Get() error {
 	return nil
 }
 
+func (self *HugeTLBPages) Get() error {
+	return ErrNotImplemented{runtime.GOOS}
+}
+
 func (self *Cpu) Get() error {
 	load := [C.CPUSTATES]C.long{C.CP_USER, C.CP_NICE, C.CP_SYS, C.CP_INTR, C.CP_IDLE}
 
@@ -341,7 +345,7 @@ func (self *CpuList) Get() error {
 	load := [C.CPUSTATES]C.long{C.CP_USER, C.CP_NICE, C.CP_SYS, C.CP_INTR, C.CP_IDLE}
 
 	self.List = make([]Cpu, ncpu)
-	for curcpu, _ := range self.List {
+	for curcpu := range self.List {
 		sysctlCptime(ncpu, curcpu, &load)
 		fillCpu(&self.List[curcpu], load)
 	}
@@ -370,7 +374,7 @@ func (self *ProcMem) Get(pid int) error {
 }
 
 func (self *ProcTime) Get(pid int) error {
-	return nil
+	return ErrNotImplemented{runtime.GOOS}
 }
 
 func (self *ProcExe) Get(pid int) error {
@@ -378,6 +382,10 @@ func (self *ProcExe) Get(pid int) error {
 }
 
 func (self *ProcFDUsage) Get(pid int) error {
+	return ErrNotImplemented{runtime.GOOS}
+}
+
+func (self *Rusage) Get(pid int) error {
 	return ErrNotImplemented{runtime.GOOS}
 }
 

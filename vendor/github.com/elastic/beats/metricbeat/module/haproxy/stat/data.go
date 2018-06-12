@@ -4,9 +4,9 @@ import (
 	"reflect"
 
 	"github.com/elastic/beats/libbeat/common"
+	s "github.com/elastic/beats/libbeat/common/schema"
+	c "github.com/elastic/beats/libbeat/common/schema/mapstrstr"
 	"github.com/elastic/beats/metricbeat/module/haproxy"
-	s "github.com/elastic/beats/metricbeat/schema"
-	c "github.com/elastic/beats/metricbeat/schema/mapstrstr"
 )
 
 var (
@@ -110,7 +110,6 @@ var (
 
 // Map data to MapStr.
 func eventMapping(info []*haproxy.Stat) []common.MapStr {
-
 	var events []common.MapStr
 
 	for _, evt := range info {
@@ -123,7 +122,9 @@ func eventMapping(info []*haproxy.Stat) []common.MapStr {
 			source[typeOfT.Field(i).Name] = f.Interface()
 
 		}
-		events = append(events, schema.Apply(source))
+
+		data, _ := schema.Apply(source)
+		events = append(events, data)
 	}
 
 	return events

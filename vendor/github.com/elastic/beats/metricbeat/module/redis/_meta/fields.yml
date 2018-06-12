@@ -2,7 +2,7 @@
   title: "Redis"
   description: >
     Redis metrics collected from Redis.
-  short_config: false
+  release: ga
   fields:
     - name: redis
       type: group

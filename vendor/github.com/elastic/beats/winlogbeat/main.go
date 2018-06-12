@@ -10,15 +10,12 @@ package main
 import (
 	"os"
 
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/elastic/beats/winlogbeat/beater"
+	"github.com/elastic/beats/winlogbeat/cmd"
+	_ "github.com/elastic/beats/winlogbeat/include"
 )
 
-// Name of this beat.
-var Name = "winlogbeat"
-
 func main() {
-	if err := beat.Run(Name, "", beater.New); err != nil {
+	if err := cmd.RootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }

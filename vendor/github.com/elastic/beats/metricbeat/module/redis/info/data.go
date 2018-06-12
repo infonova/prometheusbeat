@@ -2,8 +2,8 @@ package info
 
 import (
 	"github.com/elastic/beats/libbeat/common"
-	s "github.com/elastic/beats/metricbeat/schema"
-	c "github.com/elastic/beats/metricbeat/schema/mapstrstr"
+	s "github.com/elastic/beats/libbeat/common/schema"
+	c "github.com/elastic/beats/libbeat/common/schema/mapstrstr"
 )
 
 var (
@@ -31,6 +31,10 @@ var (
 				"rss":   c.Int("used_memory_rss"),
 				"peak":  c.Int("used_memory_peak"),
 				"lua":   c.Int("used_memory_lua"),
+			},
+			"max": s.Object{
+				"value":  c.Int("maxmemory"),
+				"policy": c.Str("maxmemory_policy"),
 			},
 			"allocator": c.Str("mem_allocator"), // Could be moved to server as it rarely changes
 		},
@@ -152,5 +156,6 @@ func eventMapping(info map[string]string) common.MapStr {
 	for key, val := range info {
 		source[key] = val
 	}
-	return schema.Apply(source)
+	data, _ := schema.Apply(source)
+	return data
 }

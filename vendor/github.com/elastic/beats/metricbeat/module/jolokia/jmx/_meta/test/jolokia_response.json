@@ -52,5 +52,43 @@
         },
         "timestamp": 1472298687,
         "status": 200
+    },
+    {
+        "request": {
+            "mbean": "org.springframework.boot:type=Endpoint,name=metricsEndpoint",
+            "attribute": [
+                "Metrics"
+            ],
+            "type": "read"
+        },
+        "value": {
+            "Metrics": {
+                "atomikos.nbTransactions": 0.000000,
+                "classes": 18857.000000,
+                "classes.loaded": 19127.000000,
+                "classes.unloaded": 270.000000
+            }
+        },
+        "timestamp": 1472298687,
+        "status": 200
+    },
+    {
+        "request": {
+            "mbean": "Catalina:type=Server",
+            "attribute": "serverInfo",
+            "type": "read",
+            "target": {
+                "env": {
+                    "password": "QED",
+                    "user": "monitorRole"
+                },
+                "url": "service:jmx:rmi:///jndi/rmi://localhost:7091/jmxrmi"
+            }
+        },
+        "value": {
+            "serverInfo": "Apache Tomcat/9.0.7"
+        },
+        "timestamp": 1523785646,
+        "status": 200
     }
 ]

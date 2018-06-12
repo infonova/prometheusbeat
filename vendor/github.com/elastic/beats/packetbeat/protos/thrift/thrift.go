@@ -3,7 +3,6 @@ package thrift
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"expvar"
 	"fmt"
 	"math"
 	"strconv"
@@ -11,13 +10,14 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/monitoring"
 
 	"github.com/elastic/beats/packetbeat/procs"
 	"github.com/elastic/beats/packetbeat/protos"
 	"github.com/elastic/beats/packetbeat/protos/tcp"
-	"github.com/elastic/beats/packetbeat/publish"
 )
 
 type thriftPlugin struct {
@@ -39,7 +39,7 @@ type thriftPlugin struct {
 	transactionTimeout time.Duration
 
 	publishQueue chan *thriftTransaction
-	results      publish.Transactions
+	results      protos.Reporter
 	idl          *thriftIdl
 }
 
@@ -155,8 +155,8 @@ const (
 )
 
 var (
-	unmatchedRequests  = expvar.NewInt("thrift.unmatched_requests")
-	unmatchedResponses = expvar.NewInt("thrift.unmatched_responses")
+	unmatchedRequests  = monitoring.NewInt(nil, "thrift.unmatched_requests")
+	unmatchedResponses = monitoring.NewInt(nil, "thrift.unmatched_responses")
 )
 
 func init() {
@@ -165,7 +165,7 @@ func init() {
 
 func New(
 	testMode bool,
-	results publish.Transactions,
+	results protos.Reporter,
 	cfg *common.Config,
 ) (protos.Plugin, error) {
 	p := &thriftPlugin{}
@@ -184,7 +184,7 @@ func New(
 
 func (thrift *thriftPlugin) init(
 	testMode bool,
-	results publish.Transactions,
+	results protos.Reporter,
 	config *thriftConfig,
 ) error {
 	thrift.InitDefaults()
@@ -584,7 +584,6 @@ func (thrift *thriftPlugin) readMap(data []byte) (value string, ok bool, complet
 }
 
 func (thrift *thriftPlugin) readStruct(data []byte) (value string, ok bool, complete bool, off int) {
-
 	var bytesRead int
 	offset := 0
 	fields := []thriftField{}
@@ -685,7 +684,6 @@ func (thrift *thriftPlugin) funcReadersByType(typ byte) (fn thriftFieldReader, e
 }
 
 func (thrift *thriftPlugin) readField(s *thriftStream) (ok bool, complete bool, field *thriftField) {
-
 	var off int
 
 	field = new(thriftField)
@@ -985,16 +983,7 @@ func (thrift *thriftPlugin) receivedRequest(msg *thriftMessage) {
 	thrift.transactions.Put(tuple.Hashable(), trans)
 
 	trans.ts = msg.ts
-	trans.src = common.Endpoint{
-		IP:   msg.tcpTuple.SrcIP.String(),
-		Port: msg.tcpTuple.SrcPort,
-		Proc: string(msg.cmdlineTuple.Src),
-	}
-	trans.dst = common.Endpoint{
-		IP:   msg.tcpTuple.DstIP.String(),
-		Port: msg.tcpTuple.DstPort,
-		Proc: string(msg.cmdlineTuple.Dst),
-	}
+	trans.src, trans.dst = common.MakeEndpointPair(msg.tcpTuple.BaseTuple, msg.cmdlineTuple)
 	if msg.direction == tcp.TCPDirectionReverse {
 		trans.src, trans.dst = trans.dst, trans.src
 	}
@@ -1004,7 +993,6 @@ func (thrift *thriftPlugin) receivedRequest(msg *thriftMessage) {
 }
 
 func (thrift *thriftPlugin) receivedReply(msg *thriftMessage) {
-
 	// we need to search the request first.
 	tuple := msg.tcpTuple
 
@@ -1080,23 +1068,23 @@ func (thrift *thriftPlugin) GapInStream(tcptuple *common.TCPTuple, dir uint8,
 
 func (thrift *thriftPlugin) publishTransactions() {
 	for t := range thrift.publishQueue {
-		event := common.MapStr{}
+		fields := common.MapStr{}
 
-		event["type"] = "thrift"
+		fields["type"] = "thrift"
 		if t.reply != nil && t.reply.hasException {
-			event["status"] = common.ERROR_STATUS
+			fields["status"] = common.ERROR_STATUS
 		} else {
-			event["status"] = common.OK_STATUS
+			fields["status"] = common.OK_STATUS
 		}
-		event["responsetime"] = t.responseTime
+		fields["responsetime"] = t.responseTime
 		thriftmap := common.MapStr{}
 
 		if t.request != nil {
-			event["method"] = t.request.method
-			event["path"] = t.request.service
-			event["query"] = fmt.Sprintf("%s%s", t.request.method, t.request.params)
-			event["bytes_in"] = t.bytesIn
-			event["bytes_out"] = t.bytesOut
+			fields["method"] = t.request.method
+			fields["path"] = t.request.service
+			fields["query"] = fmt.Sprintf("%s%s", t.request.method, t.request.params)
+			fields["bytes_in"] = t.bytesIn
+			fields["bytes_out"] = t.bytesOut
 			thriftmap = common.MapStr{
 				"params": t.request.params,
 			}
@@ -1105,7 +1093,7 @@ func (thrift *thriftPlugin) publishTransactions() {
 			}
 
 			if thrift.sendRequest {
-				event["request"] = fmt.Sprintf("%s%s", t.request.method,
+				fields["request"] = fmt.Sprintf("%s%s", t.request.method,
 					t.request.params)
 			}
 		}
@@ -1115,30 +1103,32 @@ func (thrift *thriftPlugin) publishTransactions() {
 			if len(t.reply.exceptions) > 0 {
 				thriftmap["exceptions"] = t.reply.exceptions
 			}
-			event["bytes_out"] = uint64(t.reply.frameSize)
+			fields["bytes_out"] = uint64(t.reply.frameSize)
 
 			if thrift.sendResponse {
 				if !t.reply.hasException {
-					event["response"] = t.reply.returnValue
+					fields["response"] = t.reply.returnValue
 				} else {
-					event["response"] = fmt.Sprintf("Exceptions: %s",
+					fields["response"] = fmt.Sprintf("Exceptions: %s",
 						t.reply.exceptions)
 				}
 			}
 			if len(t.reply.notes) > 0 {
-				event["notes"] = t.reply.notes
+				fields["notes"] = t.reply.notes
 			}
 		} else {
-			event["bytes_out"] = 0
+			fields["bytes_out"] = 0
 		}
-		event["thrift"] = thriftmap
+		fields["thrift"] = thriftmap
 
-		event["@timestamp"] = common.Time(t.ts)
-		event["src"] = &t.src
-		event["dst"] = &t.dst
+		fields["src"] = &t.src
+		fields["dst"] = &t.dst
 
 		if thrift.results != nil {
-			thrift.results.PublishTransaction(event)
+			thrift.results(beat.Event{
+				Timestamp: t.ts,
+				Fields:    fields,
+			})
 		}
 
 		logp.Debug("thrift", "Published event")

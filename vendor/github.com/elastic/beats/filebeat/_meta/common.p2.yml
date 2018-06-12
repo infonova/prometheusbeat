@@ -1,12 +1,18 @@
-#=========================== Filebeat prospectors =============================
+# For more available modules and options, please see the filebeat.reference.yml sample
+# configuration file.
 
-filebeat.prospectors:
+#=========================== Filebeat inputs =============================
 
-# Each - is a prospector. Most options can be set at the prospector level, so
-# you can use different prospectors for various configurations.
-# Below are the prospector specific configurations.
+filebeat.inputs:
 
-- input_type: log
+# Each - is an input. Most options can be set at the input level, so
+# you can use different inputs for various configurations.
+# Below are the input specific configurations.
+
+- type: log
+
+  # Change to true to enable this input configuration.
+  enabled: false
 
   # Paths that should be crawled and fetched. Glob based paths.
   paths:
@@ -15,17 +21,17 @@ filebeat.prospectors:
 
   # Exclude lines. A list of regular expressions to match. It drops the lines that are
   # matching any regular expression from the list.
-  #exclude_lines: ["^DBG"]
+  #exclude_lines: ['^DBG']
 
   # Include lines. A list of regular expressions to match. It exports the lines that are
   # matching any regular expression from the list.
-  #include_lines: ["^ERR", "^WARN"]
+  #include_lines: ['^ERR', '^WARN']
 
   # Exclude files. A list of regular expressions to match. Filebeat drops the files that
   # are matching any regular expression from the list. By default, no files are dropped.
-  #exclude_files: [".gz$"]
+  #exclude_files: ['.gz$']
 
-  # Optional additional fields. These field can be freely picked
+  # Optional additional fields. These fields can be freely picked
   # to add additional information to the crawled log files for filtering
   #fields:
   #  level: debug
@@ -47,3 +53,22 @@ filebeat.prospectors:
   # Note: After is the equivalent to previous and before is the equivalent to to next in Logstash
   #multiline.match: after
 
+
+#============================= Filebeat modules ===============================
+
+filebeat.config.modules:
+  # Glob pattern for configuration loading
+  path: ${path.config}/modules.d/*.yml
+
+  # Set to true to enable config reloading
+  reload.enabled: false
+
+  # Period on which files under path should be checked for changes
+  #reload.period: 10s
+
+#==================== Elasticsearch template setting ==========================
+
+setup.template.settings:
+  index.number_of_shards: 3
+  #index.codec: best_compression
+  #_source.enabled: false

@@ -1,11 +1,10 @@
 // +build darwin freebsd linux openbsd windows
 
-// +build darwin freebsd linux openbsd windows
-
 package memory
 
 import (
 	"github.com/elastic/beats/libbeat/common"
+	mem "github.com/elastic/beats/libbeat/metric/system/memory"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
 
@@ -13,9 +12,10 @@ import (
 )
 
 func init() {
-	if err := mb.Registry.AddMetricSet("system", "memory", New, parse.EmptyHostParser); err != nil {
-		panic(err)
-	}
+	mb.Registry.MustAddMetricSet("system", "memory", New,
+		mb.WithHostParser(parse.EmptyHostParser),
+		mb.DefaultMetricSet(),
+	)
 }
 
 // MetricSet for fetching system memory metrics.
@@ -30,17 +30,17 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 
 // Fetch fetches memory metrics from the OS.
 func (m *MetricSet) Fetch() (event common.MapStr, err error) {
-	memStat, err := GetMemory()
+	memStat, err := mem.Get()
 	if err != nil {
 		return nil, errors.Wrap(err, "memory")
 	}
-	AddMemPercentage(memStat)
+	mem.AddMemPercentage(memStat)
 
-	swapStat, err := GetSwap()
+	swapStat, err := mem.GetSwap()
 	if err != nil {
 		return nil, errors.Wrap(err, "swap")
 	}
-	AddSwapPercentage(swapStat)
+	mem.AddSwapPercentage(swapStat)
 
 	memory := common.MapStr{
 		"total": memStat.Total,
@@ -66,7 +66,26 @@ func (m *MetricSet) Fetch() (event common.MapStr, err error) {
 		},
 		"free": swapStat.Free,
 	}
-
 	memory["swap"] = swap
+
+	hugePagesStat, err := mem.GetHugeTLBPages()
+	if err != nil {
+		return nil, errors.Wrap(err, "hugepages")
+	}
+	if hugePagesStat != nil {
+		mem.AddHugeTLBPagesPercentage(hugePagesStat)
+		memory["hugepages"] = common.MapStr{
+			"total": hugePagesStat.Total,
+			"used": common.MapStr{
+				"bytes": hugePagesStat.TotalAllocatedSize,
+				"pct":   hugePagesStat.UsedPercent,
+			},
+			"free":         hugePagesStat.Free,
+			"reserved":     hugePagesStat.Reserved,
+			"surplus":      hugePagesStat.Surplus,
+			"default_size": hugePagesStat.DefaultSize,
+		}
+	}
+
 	return memory, nil
 }

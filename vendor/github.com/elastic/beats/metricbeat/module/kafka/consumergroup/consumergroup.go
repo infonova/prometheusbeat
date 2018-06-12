@@ -4,17 +4,18 @@ import (
 	"crypto/tls"
 
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
+	"github.com/elastic/beats/libbeat/common/transport/tlscommon"
 	"github.com/elastic/beats/libbeat/logp"
-	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/kafka"
 )
 
 // init registers the MetricSet with the central registry.
 func init() {
-	if err := mb.Registry.AddMetricSet("kafka", "consumergroup", New); err != nil {
-		panic(err)
-	}
+	mb.Registry.MustAddMetricSet("kafka", "consumergroup", New,
+		mb.DefaultMetricSet(),
+	)
 }
 
 // MetricSet type defines all fields of the MetricSet
@@ -36,7 +37,7 @@ var debugf = logp.MakeDebug("kafka")
 
 // New creates a new instance of the MetricSet.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	logp.Warn("BETA: The kafka consumergroup metricset is beta")
+	cfgwarn.Beta("The kafka consumergroup metricset is beta")
 
 	config := defaultConfig
 	if err := base.Module().UnpackConfig(&config); err != nil {
@@ -44,7 +45,7 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	}
 
 	var tls *tls.Config
-	tlsCfg, err := outputs.LoadTLSConfig(config.TLS)
+	tlsCfg, err := tlscommon.LoadTLSConfig(config.TLS)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +67,7 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 		Password:    config.Password,
 
 		// consumer groups API requires at least 0.9.0.0
-		Version: kafka.Version{"0.9.0.0"},
+		Version: kafka.Version{String: "0.9.0.0"},
 	}
 
 	return &MetricSet{

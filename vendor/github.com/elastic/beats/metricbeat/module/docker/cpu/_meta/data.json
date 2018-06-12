@@ -1,46 +1,60 @@
 {
-    "@timestamp": "2016-05-23T08:05:34.853Z",
+    "@timestamp": "2017-10-12T08:05:34.853Z",
     "beat": {
         "hostname": "host.example.com",
         "name": "host.example.com"
     },
     "docker": {
         "container": {
-            "id": "fa01dd9d2489b23968be9013ef55be34bdcaebddf1dab94ee9c895475052e130",
+            "id": "bbdcbc751e7eda7a50e773b4a5d8c2800af664f835ef9c0ad6bbb9c160c50d83",
             "labels": {
-                "com_docker_compose_container-number": "5",
-                "com_docker_compose_oneoff": "True",
-                "com_docker_compose_project": "environments",
-                "com_docker_compose_service": "beat",
-                "com_docker_compose_version": "1.9.0-rc4"
+                "build-date": "20170911",
+                "com_docker_compose_config-hash": "371e477ae73fd44b19bcbcf0d4feaf4de9adfb69137a8f16d09cff749724ca99",
+                "com_docker_compose_container-number": "1",
+                "com_docker_compose_oneoff": "False",
+                "com_docker_compose_project": "metricbeat",
+                "com_docker_compose_service": "elasticsearch",
+                "com_docker_compose_version": "1.21.0",
+                "license": "GPLv2",
+                "maintainer": "Elastic Docker Team \u003cdocker@elastic.co\u003e",
+                "name": "CentOS Base Image",
+                "vendor": "CentOS"
             },
-            "name": "environments_beat_run_5",
+            "name": "metricbeat_elasticsearch_1"
         },
         "cpu": {
             "core": {
                 "0": {
-                    "pct": 0,
-                    "ticks": 481110059659
+                    "pct": 0.01012583677581864,
+                    "ticks": 9528454911
                 },
                 "1": {
-                    "pct": 0.996920377,
-                    "ticks": 1188388427420
+                    "pct": 0.0069975889168765746,
+                    "ticks": 11916812270
+                },
+                "2": {
+                    "pct": 0.001329603022670025,
+                    "ticks": 10894346015
+                },
+                "3": {
+                    "pct": 0.0018390015113350126,
+                    "ticks": 10847487614
                 }
             },
             "kernel": {
-                "pct": 0,
-                "ticks": 123480000000
+                "pct": 0.010075566750629723,
+                "ticks": 1960000000
             },
             "system": {
-                "pct": 1.96,
-                "ticks": 43733560000000
+                "pct": 4,
+                "ticks": 1092479570000000
             },
             "total": {
-                "pct": 0.996920377
+                "pct": 0.02029203022670025
             },
             "user": {
-                "pct": 1,
-                "ticks": 1430680000000
+                "pct": 0.010075566750629723,
+                "ticks": 40960000000
             }
         }
     },
@@ -49,6 +63,5 @@
         "module": "docker",
         "name": "cpu",
         "rtt": 115
-    },
-    "type": "metricsets"
+    }
 }

@@ -32,20 +32,26 @@ Example Prometheusbeat event:
 
 ```
 {
-  "@timestamp": "2017-07-04T10:25:49.576Z",
-  "beat": {
-    "hostname": "virtmachine",
-    "name": "virtmachine",
-    "version": "5.4.4"
+  "@timestamp": "2018-06-12T10:33:28.122Z",
+  "@metadata": {
+    "beat": "prometheusbeat",
+    "type": "doc",
+    "version": "7.0.0-alpha1"
   },
   "labels": {
-    "instance": "localhost:9090",
     "job": "prometheus",
-    "monitor": "codelab-monitor",
-    "name": "scrape_samples_post_metric_relabeling"
+    "__name__": "scrape_samples_post_metric_relabeling",
+    "instance": "localhost:9090"
   },
-  "type": "prometheusbeat",
-  "value": 26.000000
+  "value": 349,
+  "beat": {
+    "name": "prometheusbeat",
+    "hostname": "example.com",
+    "version": "7.0.0-alpha1"
+  },
+  "host": {
+    "name": "prometheusbeat"
+  }
 }
 ```
 

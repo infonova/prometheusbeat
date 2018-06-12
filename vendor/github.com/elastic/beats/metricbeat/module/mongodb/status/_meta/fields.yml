@@ -2,6 +2,7 @@
   type: group
   description: >
     MongoDB server status metrics.
+  release: ga
   fields:
     - name: version
       type: keyword
@@ -424,11 +425,3 @@
               type: long
               description: >
                 Number of sync operations.
-
-
-
-
-
-
-
-

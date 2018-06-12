@@ -1,16 +1,17 @@
 package amqp
 
 import (
-	"expvar"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/monitoring"
+
 	"github.com/elastic/beats/packetbeat/protos"
 	"github.com/elastic/beats/packetbeat/protos/tcp"
-	"github.com/elastic/beats/packetbeat/publish"
 )
 
 var (
@@ -28,15 +29,15 @@ type amqpPlugin struct {
 	hideConnectionInformation bool
 	transactions              *common.Cache
 	transactionTimeout        time.Duration
-	results                   publish.Transactions
+	results                   protos.Reporter
 
 	//map containing functions associated with different method numbers
 	methodMap map[codeClass]map[codeMethod]amqpMethod
 }
 
 var (
-	unmatchedRequests  = expvar.NewInt("amqp.unmatched_requests")
-	unmatchedResponses = expvar.NewInt("amqp.unmatched_responses")
+	unmatchedRequests  = monitoring.NewInt(nil, "amqp.unmatched_requests")
+	unmatchedResponses = monitoring.NewInt(nil, "amqp.unmatched_responses")
 )
 
 func init() {
@@ -45,7 +46,7 @@ func init() {
 
 func New(
 	testMode bool,
-	results publish.Transactions,
+	results protos.Reporter,
 	cfg *common.Config,
 ) (protos.Plugin, error) {
 	p := &amqpPlugin{}
@@ -62,7 +63,7 @@ func New(
 	return p, nil
 }
 
-func (amqp *amqpPlugin) init(results publish.Transactions, config *amqpConfig) error {
+func (amqp *amqpPlugin) init(results protos.Reporter, config *amqpConfig) error {
 	amqp.initMethodMap()
 	amqp.setFromConfig(config)
 
@@ -250,16 +251,7 @@ func (amqp *amqpPlugin) handleAmqpRequest(msg *amqpMessage) {
 	}
 
 	trans.ts = msg.ts
-	trans.src = common.Endpoint{
-		IP:   msg.tcpTuple.SrcIP.String(),
-		Port: msg.tcpTuple.SrcPort,
-		Proc: string(msg.cmdlineTuple.Src),
-	}
-	trans.dst = common.Endpoint{
-		IP:   msg.tcpTuple.DstIP.String(),
-		Port: msg.tcpTuple.DstPort,
-		Proc: string(msg.cmdlineTuple.Dst),
-	}
+	trans.src, trans.dst = common.MakeEndpointPair(msg.tcpTuple.BaseTuple, msg.cmdlineTuple)
 	if msg.direction == tcp.TCPDirectionReverse {
 		trans.src, trans.dst = trans.dst, trans.src
 	}
@@ -344,7 +336,6 @@ func (amqp *amqpPlugin) expireTransaction(trans *amqpTransaction) {
 //This method handles published messages from clients. Being an async
 //process, the method, header and body frames are regrouped in one transaction
 func (amqp *amqpPlugin) handlePublishing(client *amqpMessage) {
-
 	tuple := client.tcpTuple
 	trans := amqp.getTransaction(tuple.Hashable())
 
@@ -354,16 +345,7 @@ func (amqp *amqpPlugin) handlePublishing(client *amqpMessage) {
 	}
 
 	trans.ts = client.ts
-	trans.src = common.Endpoint{
-		IP:   client.tcpTuple.SrcIP.String(),
-		Port: client.tcpTuple.SrcPort,
-		Proc: string(client.cmdlineTuple.Src),
-	}
-	trans.dst = common.Endpoint{
-		IP:   client.tcpTuple.DstIP.String(),
-		Port: client.tcpTuple.DstPort,
-		Proc: string(client.cmdlineTuple.Dst),
-	}
+	trans.src, trans.dst = common.MakeEndpointPair(client.tcpTuple.BaseTuple, client.cmdlineTuple)
 
 	trans.method = client.method
 	//for publishing and delivering, bytes in and out represent the length of the
@@ -389,7 +371,6 @@ func (amqp *amqpPlugin) handlePublishing(client *amqpMessage) {
 //returned messages to clients. Being an async process, the method, header and
 //body frames are regrouped in one transaction
 func (amqp *amqpPlugin) handleDelivering(server *amqpMessage) {
-
 	tuple := server.tcpTuple
 	trans := amqp.getTransaction(tuple.Hashable())
 
@@ -399,16 +380,7 @@ func (amqp *amqpPlugin) handleDelivering(server *amqpMessage) {
 	}
 
 	trans.ts = server.ts
-	trans.src = common.Endpoint{
-		IP:   server.tcpTuple.SrcIP.String(),
-		Port: server.tcpTuple.SrcPort,
-		Proc: string(server.cmdlineTuple.Src),
-	}
-	trans.dst = common.Endpoint{
-		IP:   server.tcpTuple.DstIP.String(),
-		Port: server.tcpTuple.DstPort,
-		Proc: string(server.cmdlineTuple.Dst),
-	}
+	trans.src, trans.dst = common.MakeEndpointPair(server.tcpTuple.BaseTuple, server.cmdlineTuple)
 
 	//for publishing and delivering, bytes in and out represent the length of the
 	//message itself
@@ -434,46 +406,44 @@ func (amqp *amqpPlugin) handleDelivering(server *amqpMessage) {
 }
 
 func (amqp *amqpPlugin) publishTransaction(t *amqpTransaction) {
-
 	if amqp.results == nil {
 		return
 	}
 
-	event := common.MapStr{}
-	event["type"] = "amqp"
+	fields := common.MapStr{}
+	fields["type"] = "amqp"
 
-	event["method"] = t.method
+	fields["method"] = t.method
 	if isError(t) {
-		event["status"] = common.ERROR_STATUS
+		fields["status"] = common.ERROR_STATUS
 	} else {
-		event["status"] = common.OK_STATUS
+		fields["status"] = common.OK_STATUS
 	}
-	event["responsetime"] = t.responseTime
-	event["amqp"] = t.amqp
-	event["bytes_out"] = t.bytesOut
-	event["bytes_in"] = t.bytesIn
-	event["@timestamp"] = common.Time(t.ts)
-	event["src"] = &t.src
-	event["dst"] = &t.dst
+	fields["responsetime"] = t.responseTime
+	fields["amqp"] = t.amqp
+	fields["bytes_out"] = t.bytesOut
+	fields["bytes_in"] = t.bytesIn
+	fields["src"] = &t.src
+	fields["dst"] = &t.dst
 
 	//let's try to convert request/response to a readable format
 	if amqp.sendRequest {
 		if t.method == "basic.publish" {
 			if t.toString {
 				if uint64(len(t.body)) < t.bytesIn {
-					event["request"] = string(t.body) + " [...]"
+					fields["request"] = string(t.body) + " [...]"
 				} else {
-					event["request"] = string(t.body)
+					fields["request"] = string(t.body)
 				}
 			} else {
 				if uint64(len(t.body)) < t.bytesIn {
-					event["request"] = bodyToString(t.body) + " [...]"
+					fields["request"] = bodyToString(t.body) + " [...]"
 				} else {
-					event["request"] = bodyToString(t.body)
+					fields["request"] = bodyToString(t.body)
 				}
 			}
 		} else {
-			event["request"] = t.request
+			fields["request"] = t.request
 		}
 	}
 	if amqp.sendResponse {
@@ -481,26 +451,29 @@ func (amqp *amqpPlugin) publishTransaction(t *amqpTransaction) {
 			t.method == "basic.get" {
 			if t.toString {
 				if uint64(len(t.body)) < t.bytesOut {
-					event["response"] = string(t.body) + " [...]"
+					fields["response"] = string(t.body) + " [...]"
 				} else {
-					event["response"] = string(t.body)
+					fields["response"] = string(t.body)
 				}
 			} else {
 				if uint64(len(t.body)) < t.bytesOut {
-					event["response"] = bodyToString(t.body) + " [...]"
+					fields["response"] = bodyToString(t.body) + " [...]"
 				} else {
-					event["response"] = bodyToString(t.body)
+					fields["response"] = bodyToString(t.body)
 				}
 			}
 		} else {
-			event["response"] = t.response
+			fields["response"] = t.response
 		}
 	}
 	if len(t.notes) > 0 {
-		event["notes"] = t.notes
+		fields["notes"] = t.notes
 	}
 
-	amqp.results.PublishTransaction(event)
+	amqp.results(beat.Event{
+		Timestamp: t.ts,
+		Fields:    fields,
+	})
 }
 
 //function to check if method is async or not

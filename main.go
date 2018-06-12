@@ -3,13 +3,13 @@ package main
 import (
 	"os"
 
-	"github.com/elastic/beats/libbeat/beat"
-	"github.com/infonova/prometheusbeat/beater"
+	"github.com/infonova/prometheusbeat/cmd"
+
+	_ "github.com/infonova/prometheusbeat/include"
 )
 
 func main() {
-	err := beat.Run("prometheusbeat", "", beater.New)
-	if err != nil {
+	if err := cmd.RootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }

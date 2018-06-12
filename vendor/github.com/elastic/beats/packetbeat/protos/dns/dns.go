@@ -8,19 +8,18 @@ package dns
 
 import (
 	"bytes"
-	"expvar"
 	"fmt"
-	"net"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/monitoring"
 
 	"github.com/elastic/beats/packetbeat/protos"
-	"github.com/elastic/beats/packetbeat/publish"
 
 	mkdns "github.com/miekg/dns"
 	"golang.org/x/net/publicsuffix"
@@ -39,7 +38,7 @@ type dnsPlugin struct {
 	transactions       *common.Cache
 	transactionTimeout time.Duration
 
-	results publish.Transactions // Channel where results are pushed.
+	results protos.Reporter // Channel where results are pushed.
 }
 
 var (
@@ -58,8 +57,8 @@ const (
 type transport uint8
 
 var (
-	unmatchedRequests  = expvar.NewInt("dns.unmatched_requests")
-	unmatchedResponses = expvar.NewInt("dns.unmatched_responses")
+	unmatchedRequests  = monitoring.NewInt(nil, "dns.unmatched_requests")
+	unmatchedResponses = monitoring.NewInt(nil, "dns.unmatched_responses")
 )
 
 const (
@@ -93,11 +92,10 @@ type dnsMessage struct {
 // DnsTuple contains source IP/port, destination IP/port, transport protocol,
 // and DNS ID.
 type dnsTuple struct {
-	ipLength         int
-	srcIP, dstIP     net.IP
-	srcPort, dstPort uint16
-	transport        transport
-	id               uint16
+	common.BaseTuple
+	ipLength  int
+	transport transport
+	id        uint16
 
 	raw    hashableDNSTuple // Src_ip:Src_port:Dst_ip:Dst_port:Transport:Id
 	revRaw hashableDNSTuple // Dst_ip:Dst_port:Src_ip:Src_port:Transport:Id
@@ -105,11 +103,13 @@ type dnsTuple struct {
 
 func dnsTupleFromIPPort(t *common.IPPortTuple, trans transport, id uint16) dnsTuple {
 	tuple := dnsTuple{
-		ipLength:  t.IPLength,
-		srcIP:     t.SrcIP,
-		dstIP:     t.DstIP,
-		srcPort:   t.SrcPort,
-		dstPort:   t.DstPort,
+		ipLength: t.IPLength,
+		BaseTuple: common.BaseTuple{
+			SrcIP:   t.SrcIP,
+			DstIP:   t.DstIP,
+			SrcPort: t.SrcPort,
+			DstPort: t.DstPort,
+		},
 		transport: trans,
 		id:        id,
 	}
@@ -120,11 +120,13 @@ func dnsTupleFromIPPort(t *common.IPPortTuple, trans transport, id uint16) dnsTu
 
 func (t dnsTuple) reverse() dnsTuple {
 	return dnsTuple{
-		ipLength:  t.ipLength,
-		srcIP:     t.dstIP,
-		dstIP:     t.srcIP,
-		srcPort:   t.dstPort,
-		dstPort:   t.srcPort,
+		ipLength: t.ipLength,
+		BaseTuple: common.BaseTuple{
+			SrcIP:   t.DstIP,
+			DstIP:   t.SrcIP,
+			SrcPort: t.DstPort,
+			DstPort: t.SrcPort,
+		},
 		transport: t.transport,
 		id:        t.id,
 		raw:       t.revRaw,
@@ -133,27 +135,27 @@ func (t dnsTuple) reverse() dnsTuple {
 }
 
 func (t *dnsTuple) computeHashebles() {
-	copy(t.raw[0:16], t.srcIP)
-	copy(t.raw[16:18], []byte{byte(t.srcPort >> 8), byte(t.srcPort)})
-	copy(t.raw[18:34], t.dstIP)
-	copy(t.raw[34:36], []byte{byte(t.dstPort >> 8), byte(t.dstPort)})
+	copy(t.raw[0:16], t.SrcIP)
+	copy(t.raw[16:18], []byte{byte(t.SrcPort >> 8), byte(t.SrcPort)})
+	copy(t.raw[18:34], t.DstIP)
+	copy(t.raw[34:36], []byte{byte(t.DstPort >> 8), byte(t.DstPort)})
 	copy(t.raw[36:38], []byte{byte(t.id >> 8), byte(t.id)})
 	t.raw[39] = byte(t.transport)
 
-	copy(t.revRaw[0:16], t.dstIP)
-	copy(t.revRaw[16:18], []byte{byte(t.dstPort >> 8), byte(t.dstPort)})
-	copy(t.revRaw[18:34], t.srcIP)
-	copy(t.revRaw[34:36], []byte{byte(t.srcPort >> 8), byte(t.srcPort)})
+	copy(t.revRaw[0:16], t.DstIP)
+	copy(t.revRaw[16:18], []byte{byte(t.DstPort >> 8), byte(t.DstPort)})
+	copy(t.revRaw[18:34], t.SrcIP)
+	copy(t.revRaw[34:36], []byte{byte(t.SrcPort >> 8), byte(t.SrcPort)})
 	copy(t.revRaw[36:38], []byte{byte(t.id >> 8), byte(t.id)})
 	t.revRaw[39] = byte(t.transport)
 }
 
 func (t *dnsTuple) String() string {
 	return fmt.Sprintf("DnsTuple src[%s:%d] dst[%s:%d] transport[%s] id[%d]",
-		t.srcIP.String(),
-		t.srcPort,
-		t.dstIP.String(),
-		t.dstPort,
+		t.SrcIP.String(),
+		t.SrcPort,
+		t.DstIP.String(),
+		t.DstPort,
 		t.transport,
 		t.id)
 }
@@ -201,7 +203,7 @@ func init() {
 
 func New(
 	testMode bool,
-	results publish.Transactions,
+	results protos.Reporter,
 	cfg *common.Config,
 ) (protos.Plugin, error) {
 	p := &dnsPlugin{}
@@ -218,7 +220,7 @@ func New(
 	return p, nil
 }
 
-func (dns *dnsPlugin) init(results publish.Transactions, config *dnsConfig) error {
+func (dns *dnsPlugin) init(results protos.Reporter, config *dnsConfig) error {
 	dns.setFromConfig(config)
 	dns.transactions = common.NewCacheWithRemovalListener(
 		dns.transactionTimeout,
@@ -254,16 +256,7 @@ func newTransaction(ts time.Time, tuple dnsTuple, cmd common.CmdlineTuple) *dnsT
 		ts:        ts,
 		tuple:     tuple,
 	}
-	trans.src = common.Endpoint{
-		IP:   tuple.srcIP.String(),
-		Port: tuple.srcPort,
-		Proc: string(cmd.Src),
-	}
-	trans.dst = common.Endpoint{
-		IP:   tuple.dstIP.String(),
-		Port: tuple.dstPort,
-		Proc: string(cmd.Dst),
-	}
+	trans.src, trans.dst = common.MakeEndpointPair(tuple.BaseTuple, &cmd)
 	return trans
 }
 
@@ -314,8 +307,7 @@ func (dns *dnsPlugin) receivedDNSResponse(tuple *dnsTuple, msg *dnsMessage) {
 
 	trans := dns.getTransaction(tuple.revHashable())
 	if trans == nil {
-		trans = newTransaction(msg.ts, tuple.reverse(), common.CmdlineTuple{
-			Src: msg.cmdlineTuple.Dst, Dst: msg.cmdlineTuple.Src})
+		trans = newTransaction(msg.ts, tuple.reverse(), msg.cmdlineTuple.Reverse())
 		trans.notes = append(trans.notes, orphanedResponse.Error())
 		debugf("%s %s", orphanedResponse.Error(), tuple.String())
 		unmatchedResponses.Add(1)
@@ -356,72 +348,75 @@ func (dns *dnsPlugin) publishTransaction(t *dnsTransaction) {
 
 	debugf("Publishing transaction. %s", t.tuple.String())
 
-	event := common.MapStr{}
-	event["@timestamp"] = common.Time(t.ts)
-	event["type"] = "dns"
-	event["transport"] = t.transport.String()
-	event["src"] = &t.src
-	event["dst"] = &t.dst
-	event["status"] = common.ERROR_STATUS
+	timestamp := t.ts
+	fields := common.MapStr{}
+	fields["type"] = "dns"
+	fields["transport"] = t.transport.String()
+	fields["src"] = &t.src
+	fields["dst"] = &t.dst
+	fields["status"] = common.ERROR_STATUS
 	if len(t.notes) == 1 {
-		event["notes"] = t.notes[0]
+		fields["notes"] = t.notes[0]
 	} else if len(t.notes) > 1 {
-		event["notes"] = strings.Join(t.notes, " ")
+		fields["notes"] = strings.Join(t.notes, " ")
 	}
 
 	dnsEvent := common.MapStr{}
-	event["dns"] = dnsEvent
+	fields["dns"] = dnsEvent
 
 	if t.request != nil && t.response != nil {
-		event["bytes_in"] = t.request.length
-		event["bytes_out"] = t.response.length
-		event["responsetime"] = int32(t.response.ts.Sub(t.ts).Nanoseconds() / 1e6)
-		event["method"] = dnsOpCodeToString(t.request.data.Opcode)
+		fields["bytes_in"] = t.request.length
+		fields["bytes_out"] = t.response.length
+		fields["responsetime"] = int32(t.response.ts.Sub(t.ts).Nanoseconds() / 1e6)
+		fields["method"] = dnsOpCodeToString(t.request.data.Opcode)
 		if len(t.request.data.Question) > 0 {
-			event["query"] = dnsQuestionToString(t.request.data.Question[0])
-			event["resource"] = t.request.data.Question[0].Name
+			fields["query"] = dnsQuestionToString(t.request.data.Question[0])
+			fields["resource"] = t.request.data.Question[0].Name
 		}
 		addDNSToMapStr(dnsEvent, t.response.data, dns.includeAuthorities,
 			dns.includeAdditionals)
 
 		if t.response.data.Rcode == 0 {
-			event["status"] = common.OK_STATUS
+			fields["status"] = common.OK_STATUS
 		}
 
 		if dns.sendRequest {
-			event["request"] = dnsToString(t.request.data)
+			fields["request"] = dnsToString(t.request.data)
 		}
 		if dns.sendResponse {
-			event["response"] = dnsToString(t.response.data)
+			fields["response"] = dnsToString(t.response.data)
 		}
 	} else if t.request != nil {
-		event["bytes_in"] = t.request.length
-		event["method"] = dnsOpCodeToString(t.request.data.Opcode)
+		fields["bytes_in"] = t.request.length
+		fields["method"] = dnsOpCodeToString(t.request.data.Opcode)
 		if len(t.request.data.Question) > 0 {
-			event["query"] = dnsQuestionToString(t.request.data.Question[0])
-			event["resource"] = t.request.data.Question[0].Name
+			fields["query"] = dnsQuestionToString(t.request.data.Question[0])
+			fields["resource"] = t.request.data.Question[0].Name
 		}
 		addDNSToMapStr(dnsEvent, t.request.data, dns.includeAuthorities,
 			dns.includeAdditionals)
 
 		if dns.sendRequest {
-			event["request"] = dnsToString(t.request.data)
+			fields["request"] = dnsToString(t.request.data)
 		}
 	} else if t.response != nil {
-		event["bytes_out"] = t.response.length
-		event["method"] = dnsOpCodeToString(t.response.data.Opcode)
+		fields["bytes_out"] = t.response.length
+		fields["method"] = dnsOpCodeToString(t.response.data.Opcode)
 		if len(t.response.data.Question) > 0 {
-			event["query"] = dnsQuestionToString(t.response.data.Question[0])
-			event["resource"] = t.response.data.Question[0].Name
+			fields["query"] = dnsQuestionToString(t.response.data.Question[0])
+			fields["resource"] = t.response.data.Question[0].Name
 		}
 		addDNSToMapStr(dnsEvent, t.response.data, dns.includeAuthorities,
 			dns.includeAdditionals)
 		if dns.sendResponse {
-			event["response"] = dnsToString(t.response.data)
+			fields["response"] = dnsToString(t.response.data)
 		}
 	}
 
-	dns.results.PublishTransaction(event)
+	dns.results(beat.Event{
+		Timestamp: timestamp,
+		Fields:    fields,
+	})
 }
 
 func (dns *dnsPlugin) expireTransaction(t *dnsTransaction) {
@@ -489,7 +484,6 @@ func addDNSToMapStr(m common.MapStr, dns *mkdns.Msg, authority bool, additional 
 			m["additionals"] = rrsMapStrs
 		}
 	}
-
 }
 
 func optToMapStr(rrOPT *mkdns.OPT) common.MapStr {

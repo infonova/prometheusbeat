@@ -3,15 +3,18 @@ package protos
 import (
 	"time"
 
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/packetbeat/publish"
 )
 
 type ProtocolPlugin func(
 	testMode bool,
-	results publish.Transactions,
+	results Reporter,
 	cfg *common.Config,
 ) (Plugin, error)
+
+// Reporter is used by plugin instances to report new transaction events.
+type Reporter func(beat.Event)
 
 // Functions to be exported by a protocol plugin
 type Plugin interface {
@@ -45,6 +48,15 @@ type UDPPlugin interface {
 
 	// ParseUDP is invoked when UDP payload data is available for parsing.
 	ParseUDP(pkt *Packet)
+}
+
+// ExpirationAwareTCPPlugin is a TCPPlugin that also provides the Expired()
+// method. No need to use this type directly, just implement the method.
+type ExpirationAwareTCPPlugin interface {
+	TCPPlugin
+
+	// Expired is called when the TCP stream is expired due to connection timeout.
+	Expired(tuple *common.TCPTuple, private ProtocolData)
 }
 
 // Protocol identifier.
