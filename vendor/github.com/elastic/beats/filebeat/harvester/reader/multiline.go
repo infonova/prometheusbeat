@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elastic/beats/libbeat/common/match"
+	"github.com/elastic/beats/libbeat/logp"
 )
 
 // MultiLine reader combining multiple line events into one multi-line event.
@@ -20,16 +21,17 @@ import (
 // Errors will force the multiline reader to return the currently active
 // multiline event first and finally return the actual error on next call to Next.
 type Multiline struct {
-	reader    Reader
-	pred      matcher
-	maxBytes  int // bytes stored in content
-	maxLines  int
-	separator []byte
-	last      []byte
-	numLines  int
-	err       error // last seen error
-	state     func(*Multiline) (Message, error)
-	message   Message
+	reader       Reader
+	pred         matcher
+	flushMatcher *match.Matcher
+	maxBytes     int // bytes stored in content
+	maxLines     int
+	separator    []byte
+	last         []byte
+	numLines     int
+	err          error // last seen error
+	state        func(*Multiline) (Message, error)
+	message      Message
 }
 
 const (
@@ -66,10 +68,12 @@ func NewMultiline(
 		return nil, fmt.Errorf("unknown matcher type: %s", config.Match)
 	}
 
-	matcher, err := matcherType(config.Pattern)
+	matcher, err := matcherType(*config.Pattern)
 	if err != nil {
 		return nil, err
 	}
+
+	flushMatcher := config.FlushPattern
 
 	if config.Negate {
 		matcher = negatedMatcher(matcher)
@@ -93,13 +97,14 @@ func NewMultiline(
 	}
 
 	mlr := &Multiline{
-		reader:    reader,
-		pred:      matcher,
-		state:     (*Multiline).readFirst,
-		maxBytes:  maxBytes,
-		maxLines:  maxLines,
-		separator: []byte(separator),
-		message:   Message{},
+		reader:       reader,
+		pred:         matcher,
+		flushMatcher: flushMatcher,
+		state:        (*Multiline).readFirst,
+		maxBytes:     maxBytes,
+		maxLines:     maxLines,
+		separator:    []byte(separator),
+		message:      Message{},
 	}
 	return mlr, nil
 }
@@ -117,6 +122,8 @@ func (mlr *Multiline) readFirst() (Message, error) {
 			if err == sigMultilineTimeout {
 				continue
 			}
+
+			logp.Debug("multiline", "Multiline event flushed because timeout reached.")
 
 			// pass error to caller (next layer) for handling
 			return message, err
@@ -144,6 +151,8 @@ func (mlr *Multiline) readNext() (Message, error) {
 				if mlr.numLines == 0 {
 					continue
 				}
+
+				logp.Debug("multiline", "Multiline event flushed because timeout reached.")
 
 				// return collected multiline event and
 				// empty buffer for new multiline event
@@ -186,6 +195,20 @@ func (mlr *Multiline) readNext() (Message, error) {
 			return msg, nil
 		}
 
+		// handle case when endPattern is reached
+		if mlr.flushMatcher != nil {
+			endPatternReached := (mlr.flushMatcher.Match(message.Content))
+
+			if endPatternReached == true {
+				// return collected multiline event and
+				// empty buffer for new multiline event
+				mlr.addLine(message)
+				msg := mlr.finalize()
+				mlr.resetState()
+				return msg, nil
+			}
+		}
+
 		// if predicate does not match current multiline -> return multiline event
 		if mlr.message.Bytes > 0 && !mlr.pred(mlr.last, message.Content) {
 			msg := mlr.finalize()
@@ -225,7 +248,6 @@ func (mlr *Multiline) clear() {
 
 // finalize writes the existing content into the returned message and resets all reader variables.
 func (mlr *Multiline) finalize() Message {
-
 	// Copy message from existing content
 	msg := mlr.message
 	mlr.clear()

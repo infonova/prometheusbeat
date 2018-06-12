@@ -2,6 +2,7 @@
 """Cherry pick and backport a PR"""
 
 import sys
+import os
 import argparse
 from os.path import expanduser
 import re
@@ -38,7 +39,7 @@ PR.
 def main():
     """Main"""
     parser = argparse.ArgumentParser(
-        description="Creates a PR for merging two branches",
+        description="Creates a PR for cherry-picking commits",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=usage)
     parser.add_argument("to_branch",
@@ -47,7 +48,7 @@ def main():
                         help="The PR number being merged (e.g. 2345)")
     parser.add_argument("commit_hashes", metavar="hash", nargs="+",
                         help="The commit hashes to cherry pick." +
-                             " You can specify multiple.")
+                        " You can specify multiple.")
     parser.add_argument("--yes", action="store_true",
                         help="Assume yes. Warning: discards local changes.")
     parser.add_argument("--continue", action="store_true",
@@ -56,7 +57,9 @@ def main():
                         help="From branch")
     parser.add_argument("--create_pr", action="store_true",
                         help="Create a PR using the Github API " +
-                             "(requires token in ~/.elastic/github.token)")
+                        "(requires token in ~/.elastic/github.token)")
+    parser.add_argument("--diff", action="store_true",
+                        help="Display the diff before pushing the PR")
     args = parser.parse_args()
 
     print(args)
@@ -65,7 +68,7 @@ def main():
 
     if not vars(args)["continue"]:
         if not args.yes and raw_input("This will destroy all local changes. " +
-                                              "Continue? [y/n]: ") != "y":
+                                      "Continue? [y/n]: ") != "y":
             return 1
         check_call("git reset --hard", shell=True)
         check_call("git clean -df", shell=True)
@@ -97,6 +100,12 @@ def main():
         print("No commit to push")
         return 1
 
+    if args.diff:
+        call("git diff {}".format(args.to_branch), shell=True)
+        if raw_input("Continue? [y/n]: ") != "y":
+            print("Aborting cherry-pick.")
+            return 1
+
     print("Ready to push branch.")
     remote = raw_input("To which remote should I push? (your fork): ")
     call("git push {} :{} > /dev/null".format(remote, tmp_branch),
@@ -126,7 +135,7 @@ def main():
             head=remote_user + ":" + tmp_branch,
             base=args.to_branch,
             body="Cherry-pick of PR #{} to {} branch. Original message: \n\n{}"
-                .format(args.pr_number, args.to_branch, original_pr["body"])
+            .format(args.pr_number, args.to_branch, original_pr["body"])
         ))
         if request.status_code > 299:
             print("Creating PR failed: {}".format(request.json()))
@@ -140,8 +149,22 @@ def main():
         # remove needs backport label from the original PR
         session.delete(base + "/issues/{}/labels/needs_backport".format(args.pr_number))
 
+        # get version and set a version label on the original PR
+        version = get_version(os.getcwd())
+        if version:
+            session.post(
+                base + "/issues/{}/labels".format(args.pr_number), json=["v" + version])
+
         print("\nDone. PR created: {}".format(new_pr["html_url"]))
         print("Please go and check it and add the review tags")
+
+def get_version(beats_dir):
+    pattern = re.compile(r'(const\s|)\w*(v|V)ersion\s=\s"(?P<version>.*)"')
+    with open(os.path.join(beats_dir, "libbeat/version/version.go"), "r") as f:
+        for line in f:
+            match = pattern.match(line)
+            if match:
+                return match.group('version')
 
 
 if __name__ == "__main__":

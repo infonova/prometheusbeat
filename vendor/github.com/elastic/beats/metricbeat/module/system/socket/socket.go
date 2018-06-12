@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
@@ -26,9 +27,9 @@ var (
 )
 
 func init() {
-	if err := mb.Registry.AddMetricSet("system", "socket", New, parse.EmptyHostParser); err != nil {
-		panic(err)
-	}
+	mb.Registry.MustAddMetricSet("system", "socket", New,
+		mb.WithHostParser(parse.EmptyHostParser),
+	)
 }
 
 type MetricSet struct {
@@ -45,6 +46,8 @@ type MetricSet struct {
 }
 
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Beta("The system collector metricset is beta")
+
 	c := defaultConfig
 	if err := base.Module().UnpackConfig(&c); err != nil {
 		return nil, err

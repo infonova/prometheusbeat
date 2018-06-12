@@ -19,7 +19,7 @@ func TestFetchEventContents(t *testing.T) {
 	response, err := ioutil.ReadFile(absPath + "/df_sample_response.json")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Header().Set("Content-Type", "appication/json;")
+		w.Header().Set("Content-Type", "application/json;")
 		w.Write([]byte(response))
 	}))
 	defer server.Close()
@@ -49,6 +49,5 @@ func TestFetchEventContents(t *testing.T) {
 	assert.EqualValues(t, 0, used["kb"])
 
 	available := stats["available"].(common.MapStr)
-	assert.EqualValues(t, 5003444224, available["bytes"])
-
+	assert.EqualValues(t, uint64(5003444224), available["bytes"])
 }

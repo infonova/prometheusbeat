@@ -7,7 +7,6 @@ package gosigar
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -53,35 +52,38 @@ func (self *LoadAverage) Get() error {
 }
 
 func (self *Mem) Get() error {
-	var buffers, cached uint64
-	table := map[string]*uint64{
-		"MemTotal": &self.Total,
-		"MemFree":  &self.Free,
-		"Buffers":  &buffers,
-		"Cached":   &cached,
-	}
 
-	if err := parseMeminfo(table); err != nil {
+	table, err := parseMeminfo()
+	if err != nil {
 		return err
 	}
 
+	self.Total, _ = table["MemTotal"]
+	self.Free, _ = table["MemFree"]
+	buffers, _ := table["Buffers"]
+	cached, _ := table["Cached"]
+
+	if available, ok := table["MemAvailable"]; ok {
+		// MemAvailable is in /proc/meminfo (kernel 3.14+)
+		self.ActualFree = available
+	} else {
+		self.ActualFree = self.Free + buffers + cached
+	}
+
 	self.Used = self.Total - self.Free
-	kern := buffers + cached
-	self.ActualFree = self.Free + kern
-	self.ActualUsed = self.Used - kern
+	self.ActualUsed = self.Total - self.ActualFree
 
 	return nil
 }
 
 func (self *Swap) Get() error {
-	table := map[string]*uint64{
-		"SwapTotal": &self.Total,
-		"SwapFree":  &self.Free,
-	}
 
-	if err := parseMeminfo(table); err != nil {
+	table, err := parseMeminfo()
+	if err != nil {
 		return err
 	}
+	self.Total, _ = table["SwapTotal"]
+	self.Free, _ = table["SwapFree"]
 
 	self.Used = self.Total - self.Free
 	return nil
@@ -178,44 +180,58 @@ func (self *ProcList) Get() error {
 }
 
 func (self *ProcState) Get(pid int) error {
-	contents, err := readProcFile(pid, "stat")
+	data, err := readProcFile(pid, "stat")
 	if err != nil {
 		return err
 	}
 
-	headerAndStats := strings.SplitAfterN(string(contents), ")", 2)
-	pidAndName := headerAndStats[0]
-	fields := strings.Fields(headerAndStats[1])
+	// Extract the comm value with is surrounded by parentheses.
+	lIdx := bytes.Index(data, []byte("("))
+	rIdx := bytes.LastIndex(data, []byte(")"))
+	if lIdx < 0 || rIdx < 0 || lIdx >= rIdx || rIdx+2 >= len(data) {
+		return fmt.Errorf("failed to extract comm for pid %d from '%v'", pid, string(data))
+	}
+	self.Name = string(data[lIdx+1 : rIdx])
 
-	name := strings.SplitAfterN(pidAndName, " ", 2)[1]
-	if name[0] == '(' && name[len(name)-1] == ')' {
-		self.Name = name[1 : len(name)-1] // strip ()'s
-	} else {
-		return errors.New(fmt.Sprintf("Malformed process stats for pid %d", pid))
+	// Extract the rest of the fields that we are interested in.
+	fields := bytes.Fields(data[rIdx+2:])
+	if len(fields) <= 36 {
+		return fmt.Errorf("expected more stat fields for pid %d from '%v'", pid, string(data))
 	}
 
-	self.State = RunState(fields[0][0])
+	interests := bytes.Join([][]byte{
+		fields[0],  // state
+		fields[1],  // ppid
+		fields[2],  // pgrp
+		fields[4],  // tty_nr
+		fields[15], // priority
+		fields[16], // nice
+		fields[36], // processor (last processor executed on)
+	}, []byte(" "))
 
-	self.Ppid, _ = strconv.Atoi(fields[1])
-
-	self.Pgid, _ = strconv.Atoi(fields[2])
-
-	self.Tty, _ = strconv.Atoi(fields[4])
-
-	self.Priority, _ = strconv.Atoi(fields[15])
-
-	self.Nice, _ = strconv.Atoi(fields[16])
-
-	self.Processor, _ = strconv.Atoi(fields[36])
+	var state string
+	_, err = fmt.Fscan(bytes.NewBuffer(interests),
+		&state,
+		&self.Ppid,
+		&self.Pgid,
+		&self.Tty,
+		&self.Priority,
+		&self.Nice,
+		&self.Processor,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to parse stat fields for pid %d from '%v': %v", pid, string(data), err)
+	}
+	self.State = RunState(state[0])
 
 	// Read /proc/[pid]/status to get the uid, then lookup uid to get username.
 	status, err := getProcStatus(pid)
 	if err != nil {
-		return fmt.Errorf("failed to read process status for pid %d. %v", pid, err)
+		return fmt.Errorf("failed to read process status for pid %d: %v", pid, err)
 	}
 	uids, err := getUIDs(status)
 	if err != nil {
-		return fmt.Errorf("failed to read process status for pid %d. %v", pid, err)
+		return fmt.Errorf("failed to read process status for pid %d: %v", pid, err)
 	}
 	user, err := user.LookupId(uids[0])
 	if err == nil {
@@ -353,20 +369,30 @@ func (self *ProcExe) Get(pid int) error {
 	return nil
 }
 
-func parseMeminfo(table map[string]*uint64) error {
-	return readFile(Procd+"/meminfo", func(line string) bool {
+func parseMeminfo() (map[string]uint64, error) {
+	table := map[string]uint64{}
+
+	err := readFile(Procd+"/meminfo", func(line string) bool {
 		fields := strings.Split(line, ":")
 
-		if ptr := table[fields[0]]; ptr != nil {
-			num := strings.TrimLeft(fields[1], " ")
-			val, err := strtoull(strings.Fields(num)[0])
-			if err == nil {
-				*ptr = val * 1024
-			}
+		if len(fields) != 2 {
+			return true // skip on errors
 		}
+
+		valueUnit := strings.Fields(fields[1])
+		value, err := strtoull(valueUnit[0])
+		if err != nil {
+			return true // skip on errors
+		}
+
+		if len(valueUnit) > 1 && valueUnit[1] == "kB" {
+			value *= 1024
+		}
+		table[fields[0]] = value
 
 		return true
 	})
+	return table, err
 }
 
 func readFile(file string, handler func(string) bool) error {

@@ -1,16 +1,21 @@
+// +build linux
+
 package linux
 
 import (
-	"encoding/binary"
 	"errors"
+
+	"github.com/elastic/gosigar/sys"
 )
+
+// Netlink Error Code Handling
 
 // ParseNetlinkError parses the errno from the data section of a
 // syscall.NetlinkMessage. If netlinkData is less than 4 bytes an error
 // describing the problem will be returned.
 func ParseNetlinkError(netlinkData []byte) error {
 	if len(netlinkData) >= 4 {
-		errno := -binary.LittleEndian.Uint32(netlinkData[:4])
+		errno := -sys.GetEndian().Uint32(netlinkData[:4])
 		return NetlinkErrno(errno)
 	}
 	return errors.New("received netlink error (data too short to read errno)")

@@ -3,28 +3,29 @@ This file is generated! See scripts/docs_collector.py
 ////
 
 [[metricbeat-module-kafka]]
-== kafka Module
+== Kafka module
 
 beta[]
 
-This is the kafka Module.
+This is the Kafka module.
 
+The default metricsets are `consumergroup` and `partition`.
 
 
 [float]
-=== Example Configuration
+=== Example configuration
 
-The kafka module supports the standard configuration options that are described
+The Kafka module supports the standard configuration options that are described
 in <<configuration-metricbeat>>. Here is an example configuration:
 
 [source,yaml]
 ----
 metricbeat.modules:
-#- module: kafka
-  #metricsets: ["partition"]
-  #enabled: true
-  #period: 10s
-  #hosts: ["localhost:9092"]
+- module: kafka
+  metricsets: ["consumergroup", "partition"]
+  period: 10s
+  hosts: ["localhost:9092"]
+  enabled: true
 
   #client_id: metricbeat
   #retries: 3

@@ -4,15 +4,13 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/elastic/beats/libbeat/common"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/snappy"
 
-	"github.com/prometheus/prometheus/storage/remote"
+	"github.com/prometheus/prometheus/prompb"
 
 	"github.com/infonova/prometheusbeat/config"
 )
@@ -62,7 +60,7 @@ func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http
 		}
 	}
 
-	var req remote.WriteRequest
+	var req prompb.WriteRequest
 	if err := proto.Unmarshal(reqBuf, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -72,15 +70,13 @@ func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http
 		event := map[string]interface{}{}
 		labels := map[string]interface{}{}
 		for _, l := range ts.Labels {
-			// field names with _ are not supported
-			fieldName := strings.Replace(l.Name, "_", "", -1)
-			labels[fieldName] = l.Value
+			labels[l.Name] = l.Value
 		}
 		event["labels"] = labels
 
 		for _, s := range ts.Samples {
 			event["value"] = s.Value
-			event["@timestamp"] = common.Time(time.Unix(0, s.TimestampMs*1000000))
+			event["timestamp"] = s.Timestamp
 		}
 
 		promSrv.prometheusEvents <- event

@@ -1,59 +1,55 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
+	"github.com/elastic/beats/libbeat/autodiscover"
 	"github.com/elastic/beats/libbeat/cfgfile"
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/paths"
 )
 
 // Defaults for config variables which are not set
 const (
-	DefaultInputType = "log"
+	DefaultType = "log"
 )
 
 type Config struct {
-	Prospectors      []*common.Config `config:"prospectors"`
-	SpoolSize        uint64           `config:"spool_size" validate:"min=1"`
-	PublishAsync     bool             `config:"publish_async"`
-	IdleTimeout      time.Duration    `config:"idle_timeout" validate:"nonzero,min=0s"`
-	RegistryFile     string           `config:"registry_file"`
-	ConfigDir        string           `config:"config_dir"`
-	ShutdownTimeout  time.Duration    `config:"shutdown_timeout"`
-	Modules          []*common.Config `config:"modules"`
-	ProspectorReload *common.Config   `config:"config.prospectors"`
+	Inputs                  []*common.Config     `config:"inputs"`
+	Prospectors             []*common.Config     `config:"prospectors"`
+	RegistryFile            string               `config:"registry_file"`
+	RegistryFilePermissions os.FileMode          `config:"registry_file_permissions"`
+	RegistryFlush           time.Duration        `config:"registry_flush"`
+	ConfigDir               string               `config:"config_dir"`
+	ShutdownTimeout         time.Duration        `config:"shutdown_timeout"`
+	Modules                 []*common.Config     `config:"modules"`
+	ConfigInput             *common.Config       `config:"config.inputs"`
+	ConfigProspector        *common.Config       `config:"config.prospectors"`
+	ConfigModules           *common.Config       `config:"config.modules"`
+	Autodiscover            *autodiscover.Config `config:"autodiscover"`
+	OverwritePipelines      bool                 `config:"overwrite_pipelines"`
 }
 
 var (
 	DefaultConfig = Config{
-		RegistryFile:    "registry",
-		SpoolSize:       2048,
-		IdleTimeout:     5 * time.Second,
-		ShutdownTimeout: 0,
+		RegistryFile:            "registry",
+		RegistryFilePermissions: 0600,
+		ShutdownTimeout:         0,
+		OverwritePipelines:      false,
 	}
 )
-
-const (
-	LogInputType   = "log"
-	StdinInputType = "stdin"
-)
-
-// List of valid input types
-var ValidInputType = map[string]struct{}{
-	StdinInputType: {},
-	LogInputType:   {},
-}
 
 // getConfigFiles returns list of config files.
 // In case path is a file, it will be directly returned.
 // In case it is a directory, it will fetch all .yml files inside this directory
 func getConfigFiles(path string) (configFiles []string, err error) {
-
 	// Check if path is valid file or dir
 	stat, err := os.Stat(path)
 	if err != nil {
@@ -82,16 +78,26 @@ func getConfigFiles(path string) (configFiles []string, err error) {
 
 // mergeConfigFiles reads in all config files given by list configFiles and merges them into config
 func mergeConfigFiles(configFiles []string, config *Config) error {
-
 	for _, file := range configFiles {
 		logp.Info("Additional configs loaded from: %s", file)
 
 		tmpConfig := struct {
 			Filebeat Config
 		}{}
-		cfgfile.Read(&tmpConfig, file)
+		err := cfgfile.Read(&tmpConfig, file)
+		if err != nil {
+			return fmt.Errorf("Failed to read %s: %s", file, err)
+		}
 
-		config.Prospectors = append(config.Prospectors, tmpConfig.Filebeat.Prospectors...)
+		if len(tmpConfig.Filebeat.Prospectors) > 0 {
+			cfgwarn.Deprecate("7.0.0", "prospectors are deprecated, Use `inputs` instead.")
+			if len(tmpConfig.Filebeat.Inputs) > 0 {
+				return fmt.Errorf("prospectors and inputs used in the configuration file, define only inputs not both")
+			}
+			tmpConfig.Filebeat.Inputs = append(tmpConfig.Filebeat.Inputs, tmpConfig.Filebeat.Prospectors...)
+		}
+
+		config.Inputs = append(config.Inputs, tmpConfig.Filebeat.Inputs...)
 	}
 
 	return nil
@@ -99,13 +105,14 @@ func mergeConfigFiles(configFiles []string, config *Config) error {
 
 // Fetches and merges all config files given by configDir. All are put into one config object
 func (config *Config) FetchConfigs() error {
-
 	configDir := config.ConfigDir
 
 	// If option not set, do nothing
 	if configDir == "" {
 		return nil
 	}
+
+	cfgwarn.Deprecate("7.0.0", "config_dir is deprecated. Use `filebeat.config.inputs` instead.")
 
 	// If configDir is relative, consider it relative to the config path
 	configDir = paths.Resolve(paths.Config, configDir)
@@ -127,4 +134,31 @@ func (config *Config) FetchConfigs() error {
 	}
 
 	return nil
+}
+
+// ListEnabledInputs returns a list of enabled inputs sorted by alphabetical order.
+func (config *Config) ListEnabledInputs() []string {
+	t := struct {
+		Type string `config:"type"`
+	}{}
+	var inputs []string
+	for _, input := range config.Inputs {
+		if input.Enabled() {
+			input.Unpack(&t)
+			inputs = append(inputs, t.Type)
+		}
+	}
+	sort.Strings(inputs)
+	return inputs
+}
+
+// IsInputEnabled returns true if the plugin name is enabled.
+func (config *Config) IsInputEnabled(name string) bool {
+	enabledInputs := config.ListEnabledInputs()
+	for _, input := range enabledInputs {
+		if name == input {
+			return true
+		}
+	}
+	return false
 }

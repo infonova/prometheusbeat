@@ -3,14 +3,13 @@ package main
 import (
 	"os"
 
-	"github.com/elastic/beats/libbeat/beat"
+	"{beat_path}/cmd"
 
-	"{beat_path}/beater"
+	_ "{beat_path}/include"
 )
 
 func main() {
-	err := beat.Run("{beat}", "", beater.New)
-	if err != nil {
+	if err := cmd.RootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }

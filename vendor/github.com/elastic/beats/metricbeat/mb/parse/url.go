@@ -14,10 +14,12 @@ import (
 // URLHostParserBuilder builds a tailored HostParser for used with host strings
 // that are URLs.
 type URLHostParserBuilder struct {
-	PathConfigKey string
-	DefaultPath   string
-	DefaultScheme string
-	QueryParams   string
+	PathConfigKey   string
+	DefaultPath     string
+	DefaultUsername string
+	DefaultPassword string
+	DefaultScheme   string
+	QueryParams     string
 }
 
 // Build returns a new HostParser function whose behavior is influenced by the
@@ -37,6 +39,8 @@ func (b URLHostParserBuilder) Build() mb.HostParser {
 			if !ok {
 				return mb.HostData{}, errors.Errorf("'username' config for module %v is not a string", module.Name())
 			}
+		} else {
+			user = b.DefaultUsername
 		}
 		t, ok = conf["password"]
 		if ok {
@@ -44,6 +48,8 @@ func (b URLHostParserBuilder) Build() mb.HostParser {
 			if !ok {
 				return mb.HostData{}, errors.Errorf("'password' config for module %v is not a string", module.Name())
 			}
+		} else {
+			pass = b.DefaultPassword
 		}
 		t, ok = conf[b.PathConfigKey]
 		if ok {
@@ -61,7 +67,8 @@ func (b URLHostParserBuilder) Build() mb.HostParser {
 
 // NewHostDataFromURL returns a new HostData based on the contents of the URL.
 // If the URLs scheme is "unix" or end is "unix" (e.g. "http+unix://") then
-// the HostData.Host field is set to the URLs path instead of the URLs host.
+// the HostData.Host field is set to the URLs path instead of the URLs host,
+// the same happens for "npipe".
 func NewHostDataFromURL(u *url.URL) mb.HostData {
 	var user, pass string
 	if u.User != nil {
@@ -70,7 +77,7 @@ func NewHostDataFromURL(u *url.URL) mb.HostData {
 	}
 
 	host := u.Host
-	if strings.HasSuffix(u.Scheme, "unix") {
+	if strings.HasSuffix(u.Scheme, "unix") || strings.HasSuffix(u.Scheme, "npipe") {
 		host = u.Path
 	}
 
@@ -140,7 +147,7 @@ func getURL(rawURL, scheme, username, password, path, query string) (*url.URL, e
 
 	SetURLUser(u, username, password)
 
-	if !strings.HasSuffix(u.Scheme, "unix") {
+	if !strings.HasSuffix(u.Scheme, "unix") && !strings.HasSuffix(u.Scheme, "npipe") {
 		if u.Host == "" {
 			return nil, fmt.Errorf("error parsing URL: empty host")
 		}

@@ -19,7 +19,7 @@
         "field": "message"
       }
     },
-		{
+    {
       "date": {
         "field": "system.syslog.timestamp",
         "target_field": "@timestamp",
@@ -27,13 +27,14 @@
 					"MMM  d HH:mm:ss",
 					"MMM dd HH:mm:ss"
         ],
+        {< if .convert_timezone >}"timezone": "{{ beat.timezone }}",{< end >}
         "ignore_failure": true
       }
-		}
+    }
 	],
   "on_failure" : [{
     "set" : {
-      "field" : "error",
+      "field" : "error.message",
       "value" : "{{ _ingest.on_failure_message }}"
     }
   }]

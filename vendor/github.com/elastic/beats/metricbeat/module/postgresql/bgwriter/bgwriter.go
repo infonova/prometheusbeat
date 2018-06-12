@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/postgresql"
-	"github.com/pkg/errors"
 
 	// Register postgresql database/sql driver
 	_ "github.com/lib/pq"
@@ -16,9 +17,10 @@ import (
 // init registers the MetricSet with the central registry.
 // The New method will be called after the setup of the module and before starting to fetch data
 func init() {
-	if err := mb.Registry.AddMetricSet("postgresql", "bgwriter", New, postgresql.ParseURL); err != nil {
-		panic(err)
-	}
+	mb.Registry.MustAddMetricSet("postgresql", "bgwriter", New,
+		mb.WithHostParser(postgresql.ParseURL),
+		mb.DefaultMetricSet(),
+	)
 }
 
 // MetricSet type defines all fields of the MetricSet
@@ -47,5 +49,6 @@ func (m *MetricSet) Fetch() (common.MapStr, error) {
 		return nil, fmt.Errorf("No results from the pg_stat_bgwriter query")
 	}
 
-	return schema.Apply(results[0]), nil
+	data, _ := schema.Apply(results[0])
+	return data, nil
 }

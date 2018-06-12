@@ -3,13 +3,13 @@ This file is generated! See scripts/docs_collector.py
 ////
 
 [[metricbeat-module-mongodb]]
-== MongoDB Module
+== MongoDB module
 
 This module periodically fetches metrics from https://www.mongodb.com[MongoDB]
 servers.
 
 [float]
-=== Module-Specific Configuration Notes
+=== Module-specific configuration notes
 
 When configuring the `hosts` option, you must use MongoDB URLs of the following
 format:
@@ -47,6 +47,8 @@ over the username and password configuration options.
   password: test
 ----
 
+The default metricsets are `collstats`, `dbstats` and `status`.
+
 [float]
 === Compatibility
 
@@ -55,7 +57,7 @@ work with all versions >= 2.8.
 
 
 [float]
-=== Example Configuration
+=== Example configuration
 
 The MongoDB module supports the standard configuration options that are described
 in <<configuration-metricbeat>>. Here is an example configuration:
@@ -63,17 +65,17 @@ in <<configuration-metricbeat>>. Here is an example configuration:
 [source,yaml]
 ----
 metricbeat.modules:
-#- module: mongodb
-  #metricsets: ["dbstats", "status"]
-  #enabled: true
-  #period: 10s
+- module: mongodb
+  metricsets: ["dbstats", "status"]
+  period: 10s
+  enabled: true
 
   # The hosts must be passed as MongoDB URLs in the format:
   # [mongodb://][user:pass@]host[:port].
   # The username and password can also be set using the respective configuration
   # options. The credentials in the URL take precedence over the username and
   # password configuration options.
-  #hosts: ["localhost:27017"]
+  hosts: ["localhost:27017"]
 
   # Username to use when connecting to MongoDB. Empty by default.
   #username: user
@@ -87,9 +89,13 @@ metricbeat.modules:
 
 The following metricsets are available:
 
+* <<metricbeat-metricset-mongodb-collstats,collstats>>
+
 * <<metricbeat-metricset-mongodb-dbstats,dbstats>>
 
 * <<metricbeat-metricset-mongodb-status,status>>
+
+include::mongodb/collstats.asciidoc[]
 
 include::mongodb/dbstats.asciidoc[]
 

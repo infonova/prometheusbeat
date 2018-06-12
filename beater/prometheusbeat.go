@@ -2,11 +2,11 @@ package beater
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
-	"github.com/elastic/beats/libbeat/publisher"
 
 	"github.com/infonova/prometheusbeat/config"
 	"github.com/infonova/prometheusbeat/prometheus"
@@ -15,7 +15,7 @@ import (
 type Prometheusbeat struct {
 	done             chan struct{}
 	config           config.Config
-	client           publisher.Client
+	client           beat.Client
 	prometheusServer *prometheus.PrometheusServer
 }
 
@@ -37,7 +37,11 @@ func New(b *beat.Beat, cfg *common.Config) (beat.Beater, error) {
 func (bt *Prometheusbeat) Run(b *beat.Beat) error {
 	logp.Info("prometheusbeat is running! Hit CTRL-C to stop it.")
 
-	bt.client = b.Publisher.Connect()
+	var err error
+	bt.client, err = b.Publisher.Connect()
+	if err != nil {
+		return err
+	}
 
 	prometheusEvents := make(chan common.MapStr, 100000)
 
@@ -52,8 +56,15 @@ func (bt *Prometheusbeat) Run(b *beat.Beat) error {
 		case <-bt.done:
 			return nil
 		case pevent = <-prometheusEvents:
-			pevent["type"] = b.Name
-			bt.client.PublishEvent(pevent)
+			event := beat.Event{
+				Timestamp: time.Unix(0, pevent["timestamp"].(int64)*1000000),
+				Fields: common.MapStr{
+					"name":   pevent["name"],
+					"value":  pevent["value"],
+					"labels": pevent["labels"],
+				},
+			}
+			bt.client.Publish(event)
 		}
 	}
 }

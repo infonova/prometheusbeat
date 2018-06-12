@@ -3,6 +3,7 @@
 package eventlog
 
 import (
+	"bytes"
 	"flag"
 	"math/rand"
 	"os/exec"
@@ -47,33 +48,19 @@ func TestBenchmarkBatchReadSize(t *testing.T) {
 
 	// Publish test messages:
 	for i := 0; i < *injectAmount; i++ {
-		err = log.Report(elog.Info, uint32(rng.Int63()%1000), []string{strconv.Itoa(i) + " " + randString(256)})
+		err = log.Report(elog.Info, uint32(rand.Int63()%1000), []string{strconv.Itoa(i) + " " + randomSentence(256)})
 		if err != nil {
 			t.Fatal("ReportEvent error", err)
-		}
-	}
-
-	setup := func(t testing.TB, batchReadSize int) (EventLog, func()) {
-		eventlog, err := newWinEventLog(map[string]interface{}{"name": providerName, "batch_read_size": batchReadSize})
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = eventlog.Open(0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return eventlog, func() {
-			err := eventlog.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
 		}
 	}
 
 	benchTest := func(batchSize int) {
 		var err error
 		result := testing.Benchmark(func(b *testing.B) {
-			eventlog, tearDown := setup(b, batchSize)
+			eventlog, tearDown := setupWinEventLog(t, 0, map[string]interface{}{
+				"name":            providerName,
+				"batch_read_size": batchSize,
+			})
 			defer tearDown()
 			b.ResetTimer()
 
@@ -108,30 +95,44 @@ func TestBenchmarkBatchReadSize(t *testing.T) {
 
 // Utility Functions
 
-var rng = rand.NewSource(time.Now().UnixNano())
+var randomWords = []string{
+	"recover",
+	"article",
+	"highway",
+	"bargain",
+	"trolley",
+	"college",
+	"attract",
+	"wriggle",
+	"feather",
+	"neutral",
+	"percent",
+	"quality",
+	"manager",
+	"hunting",
+	"arrange",
+}
 
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-const (
-	letterIdxBits = 6                    // 6 bits to represent a letter index
-	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
-	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
-)
+func randomSentence(n uint) string {
+	buf := bytes.NewBuffer(make([]byte, n))
+	buf.Reset()
 
-// https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-golang
-func randString(n int) string {
-	b := make([]byte, n)
-	// A src.Int63() generates 63 random bits, enough for letterIdxMax characters!
-	for i, cache, remain := n-1, rng.Int63(), letterIdxMax; i >= 0; {
-		if remain == 0 {
-			cache, remain = rng.Int63(), letterIdxMax
+	for {
+		idx := rand.Uint32() % uint32(len(randomWords))
+		word := randomWords[idx]
+
+		if buf.Len()+len(word) <= buf.Cap() {
+			buf.WriteString(randomWords[idx])
+		} else {
+			break
 		}
-		if idx := int(cache & letterIdxMask); idx < len(letterBytes) {
-			b[i] = letterBytes[idx]
-			i--
+
+		if buf.Len()+1 <= buf.Cap() {
+			buf.WriteByte(' ')
+		} else {
+			break
 		}
-		cache >>= letterIdxBits
-		remain--
 	}
 
-	return string(b)
+	return buf.String()
 }

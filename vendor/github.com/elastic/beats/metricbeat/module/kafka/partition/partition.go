@@ -5,8 +5,9 @@ import (
 	"errors"
 
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
+	"github.com/elastic/beats/libbeat/common/transport/tlscommon"
 	"github.com/elastic/beats/libbeat/logp"
-	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
 	"github.com/elastic/beats/metricbeat/module/kafka"
@@ -16,9 +17,10 @@ import (
 
 // init registers the partition MetricSet with the central registry.
 func init() {
-	if err := mb.Registry.AddMetricSet("kafka", "partition", New, parse.PassThruHostParser); err != nil {
-		panic(err)
-	}
+	mb.Registry.MustAddMetricSet("kafka", "partition", New,
+		mb.WithHostParser(parse.PassThruHostParser),
+		mb.DefaultMetricSet(),
+	)
 }
 
 // MetricSet type defines all fields of the partition MetricSet
@@ -37,7 +39,7 @@ var debugf = logp.MakeDebug("kafka")
 
 // New creates a new instance of the partition MetricSet.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	logp.Warn("BETA: The kafka partition metricset is beta")
+	cfgwarn.Beta("The kafka partition metricset is beta")
 
 	config := defaultConfig
 	if err := base.Module().UnpackConfig(&config); err != nil {
@@ -45,7 +47,7 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	}
 
 	var tls *tls.Config
-	tlsCfg, err := outputs.LoadTLSConfig(config.TLS)
+	tlsCfg, err := tlscommon.LoadTLSConfig(config.TLS)
 	if err != nil {
 		return nil, err
 	}
