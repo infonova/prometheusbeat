@@ -14,7 +14,7 @@ func GetTestingElasticsearch(t internal.TestLogger) *elasticsearch.Client {
 		URL:              internal.GetURL(),
 		Index:            outil.MakeSelector(),
 		Username:         internal.GetUser(),
-		Password:         internal.GetPass(),
+		Password:         internal.GetUser(),
 		Timeout:          60 * time.Second,
 		CompressionLevel: 3,
 	}, nil)

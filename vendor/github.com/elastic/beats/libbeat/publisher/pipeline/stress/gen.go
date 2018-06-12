@@ -1,9 +1,7 @@
 package stress
 
 import (
-	"bytes"
 	"fmt"
-	"runtime/pprof"
 	"sync"
 	"time"
 
@@ -27,7 +25,7 @@ var defaultGenerateConfig = generateConfig{
 	ACK:       false,
 	MaxEvents: 0,
 	WaitClose: 0,
-	Watchdog:  2 * time.Second,
+	Watchdog:  1 * time.Second,
 }
 
 var publishModes = map[string]beat.PublishMode{
@@ -94,7 +92,7 @@ func generate(
 		// start generator watchdog
 		withWG(&wg, func() {
 			last := uint64(0)
-			ticker := time.NewTicker(config.Watchdog)
+			ticker := time.NewTicker(config.Watchdog) // todo: make ticker interval configurable
 			defer ticker.Stop()
 			for {
 				select {
@@ -107,11 +105,7 @@ func generate(
 
 				current := count.Load()
 				if last == current {
-					// collect all active go-routines stack-traces:
-					var buf bytes.Buffer
-					pprof.Lookup("goroutine").WriteTo(&buf, 2)
-
-					err := fmt.Errorf("no progress in generator %v (last=%v, current=%v):\n%s", id, last, current, buf.Bytes())
+					err := fmt.Errorf("no progress in generators (last=%v, current=%v)", last, current)
 					errors(err)
 				}
 				last = current

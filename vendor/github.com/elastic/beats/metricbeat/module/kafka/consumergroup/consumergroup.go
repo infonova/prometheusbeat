@@ -5,17 +5,17 @@ import (
 
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
-	"github.com/elastic/beats/libbeat/common/transport/tlscommon"
 	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/kafka"
 )
 
 // init registers the MetricSet with the central registry.
 func init() {
-	mb.Registry.MustAddMetricSet("kafka", "consumergroup", New,
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("kafka", "consumergroup", New); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet type defines all fields of the MetricSet
@@ -45,7 +45,7 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	}
 
 	var tls *tls.Config
-	tlsCfg, err := tlscommon.LoadTLSConfig(config.TLS)
+	tlsCfg, err := outputs.LoadTLSConfig(config.TLS)
 	if err != nil {
 		return nil, err
 	}

@@ -51,6 +51,8 @@ metricbeat.modules:
 - module: system
   metricsets:
     - cpu             # CPU usage
+    - filesystem      # File system usage for each mountpoint
+    - fsstat          # File system summary metrics
     - load            # CPU load averages
     - memory          # Memory usage
     - network         # Network IO
@@ -59,9 +61,6 @@ metricbeat.modules:
     - uptime          # System Uptime
     #- core           # Per CPU core usage
     #- diskio         # Disk IO
-    #- filesystem     # File system usage for each mountpoint
-    #- fsstat         # File system summary metrics
-    #- raid           # Raid
     #- socket         # Sockets and connection info (linux only)
   enabled: true
   period: 10s
@@ -74,9 +73,6 @@ metricbeat.modules:
   # A list of filesystem types to ignore. The filesystem metricset will not
   # collect data from filesystems matching any of the specified types, and
   # fsstats will not include data from these filesystems in its summary stats.
-  # If not set, types associated to virtual filesystems are automatically
-  # added when this information is available in the system (e.g. the list of
-  # `nodev` types in `/proc/filesystem`).
   #filesystem.ignore_types: []
 
   # These options allow you to filter out all processes that are not
@@ -84,7 +80,7 @@ metricbeat.modules:
   # If both the `by_cpu` and `by_memory` options are used, the union of the two sets
   # is included.
   #process.include_top_n:
-
+    #
     # Set to false to disable this feature and include all processes
     #enabled: true
 
@@ -110,21 +106,15 @@ metricbeat.modules:
   # to false.
   #process.include_cpu_ticks: false
 
-  # Raid mount point to monitor
-  #raid.mount_point: '/'
-
   # Configure reverse DNS lookup on remote IP addresses in the socket metricset.
   #socket.reverse_lookup.enabled: false
   #socket.reverse_lookup.success_ttl: 60s
   #socket.reverse_lookup.failure_ttl: 60s
 
-  # Diskio configurations
-  #diskio.include_devices: []
-
 #------------------------------ Aerospike Module -----------------------------
 - module: aerospike
   metricsets: ["namespace"]
-  enabled: true
+  enabled: false
   period: 10s
   hosts: ["localhost:3000"]
 
@@ -132,7 +122,6 @@ metricbeat.modules:
 - module: apache
   metricsets: ["status"]
   period: 10s
-  enabled: true
 
   # Apache hosts
   hosts: ["http://127.0.0.1"]
@@ -151,32 +140,18 @@ metricbeat.modules:
   metricsets: ["cluster_disk", "cluster_health", "monitor_health", "pool_disk", "osd_tree"]
   period: 10s
   hosts: ["localhost:5000"]
-  enabled: true
 
 #------------------------------ Couchbase Module -----------------------------
 - module: couchbase
   metricsets: ["bucket", "cluster", "node"]
   period: 10s
   hosts: ["localhost:8091"]
-  enabled: true
 
 #------------------------------- Docker Module -------------------------------
 - module: docker
-  metricsets:
-    - "container"
-    - "cpu"
-    - "diskio"
-    - "healthcheck"
-    - "info"
-    #- "image"
-    - "memory"
-    - "network"
+  metricsets: ["container", "cpu", "diskio", "healthcheck", "info", "memory", "network"]
   hosts: ["unix:///var/run/docker.sock"]
   period: 10s
-  enabled: true
-
-  # Replace dots in labels with `_`. Set to false to keep dots
-  labels.dedot: true
 
   # To connect to Docker over TLS you must specify a client and CA certificate.
   #ssl:
@@ -191,16 +166,10 @@ metricbeat.modules:
   hosts: ["localhost:8080"]
   metrics_path: /metrics/metrics
   namespace: example
-  enabled: true
 
 #---------------------------- Elasticsearch Module ---------------------------
 - module: elasticsearch
-  metricsets:
-    - node
-    - node_stats
-    #- index
-    #- index_summary
-    #- shard
+  metricsets: ["node", "node_stats"]
   period: 10s
   hosts: ["localhost:9200"]
 
@@ -210,11 +179,10 @@ metricbeat.modules:
   period: 10s
   hosts: ["localhost:2379"]
 
+
 #------------------------------- Golang Module -------------------------------
 - module: golang
-  #metricsets:
-  #  - expvar
-  #  - heap
+  metricsets: ["expvar","heap"]
   period: 10s
   hosts: ["localhost:6060"]
   heap.path: "/debug/vars"
@@ -226,24 +194,12 @@ metricbeat.modules:
 - module: graphite
   metricsets: ["server"]
   enabled: true
-
-  # Host address to listen on. Default localhost.
-  #host: localhost
-
-  # Listening port. Default 2003.
-  #port: 2003
-
-  # Protocol to listen on. This can be udp or tcp. Default udp.
-  #protocol: "udp"
-
-  # Receive buffer size in bytes
-  #receive_buffer_size: 1024
-
-  #templates:
-  #  - filter: "test.*.bash.*" # This would match metrics like test.localhost.bash.stats
-  #    namespace: "test"
-  #    template: ".host.shell.metric*" # test.localhost.bash.stats would become metric=stats and tags host=localhost,shell=bash
-  #    delimiter: "_"
+#  protocol: "udp"
+#  templates:
+#    - filter: "test.*.bash.*" # This would match metrics like test.localhost.bash.stats
+#      namespace: "test"
+#      template: ".host.shell.metric*" # test.localhost.bash.stats would become metric=stats and tags host=localhost,shell=bash
+#      delimiter: "_"
 
 
 #------------------------------- HAProxy Module ------------------------------
@@ -251,74 +207,47 @@ metricbeat.modules:
   metricsets: ["info", "stat"]
   period: 10s
   hosts: ["tcp://127.0.0.1:14567"]
-  enabled: true
 
 #-------------------------------- HTTP Module --------------------------------
 - module: http
-  #metricsets:
-  #  - json
+  metricsets: ["json"]
   period: 10s
   hosts: ["localhost:80"]
   namespace: "json_namespace"
   path: "/"
   #body: ""
   #method: "GET"
-  #username: "user"
-  #password: "secret"
   #request.enabled: false
   #response.enabled: false
-  #json.is_array: false
   #dedot.enabled: false
 
 - module: http
-  #metricsets:
-  #  - server
+  metricsets: ["server"]
   host: "localhost"
   port: "8080"
   enabled: false
-  #paths:
-  #  - path: "/foo"
-  #    namespace: "foo"
-  #    fields: # added to the the response in root. overwrites existing fields
-  #      key: "value"
+#  paths:
+#    - path: "/foo"
+#      namespace: "foo"
+#      fields: # added to the the response in root. overwrites existing fields
+#        key: "value"
 
 #------------------------------- Jolokia Module ------------------------------
 - module: jolokia
-  #metricsets: ["jmx"]
+  metricsets: ["jmx"]
   period: 10s
   hosts: ["localhost"]
   namespace: "metrics"
-  #path: "/jolokia/?ignoreErrors=true&canonicalNaming=false"
-  #username: "user"
-  #password: "secret"
-  jmx.mappings:
-    #- mbean: 'java.lang:type=Runtime'
-    #  attributes:
-    #    - attr: Uptime
-    #      field: uptime
-    #- mbean: 'java.lang:type=Memory'
-    #  attributes:
-    #    - attr: HeapMemoryUsage
-    #      field: memory.heap_usage
-    #    - attr: NonHeapMemoryUsage
-    #      field: memory.non_heap_usage
-    # GC Metrics - this depends on what is available on your JVM
-    #- mbean: 'java.lang:type=GarbageCollector,name=ConcurrentMarkSweep'
-    #  attributes:
-    #    - attr: CollectionTime
-    #      field: gc.cms_collection_time
-    #    - attr: CollectionCount
-    #      field: gc.cms_collection_count
-
+  path: "/jolokia/?ignoreErrors=true&canonicalNaming=false"
+  jmx.mapping:
   jmx.application:
   jmx.instance:
 
 #-------------------------------- Kafka Module -------------------------------
 - module: kafka
-  metricsets: ["consumergroup", "partition"]
+  metricsets: ["partition"]
   period: 10s
   hosts: ["localhost:9092"]
-  enabled: true
 
   #client_id: metricbeat
   #retries: 3
@@ -346,32 +275,26 @@ metricbeat.modules:
   metricsets: ["status"]
   period: 10s
   hosts: ["localhost:5601"]
-  enabled: default
 
 #----------------------------- Kubernetes Module -----------------------------
 # Node metrics, from kubelet:
 - module: kubernetes
   metricsets:
-    - container
     - node
-    - pod
     - system
+    - pod
+    - container
     - volume
   period: 10s
   hosts: ["localhost:10255"]
-  enabled: true
-  #ssl.certificate_authorities: ["/etc/pki/root/ca.pem"]
-  #ssl.certificate: "/etc/pki/client/cert.pem"
-  #ssl.key: "/etc/pki/client/cert.key"
 
 # State metrics from kube-state-metrics service:
 - module: kubernetes
-  enabled: true
+  enabled: false
   metricsets:
     - state_node
     - state_deployment
     - state_replicaset
-    - state_statefulset
     - state_pod
     - state_container
   period: 10s
@@ -379,46 +302,28 @@ metricbeat.modules:
 
 # Kubernetes events
 - module: kubernetes
-  enabled: true
+  enabled: false
   metricsets:
     - event
-
-# Kubernetes API server
-- module: kubernetes
-  enabled: true
-  metricsets:
-    - apiserver
-  hosts: ["https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"]
-
-#--------------------------------- kvm Module --------------------------------
-- module: kvm
-  metricsets: ["dommemstat"]
-  enabled: true
-  period: 10s
-  hosts: ["localhost"]
-
-  # Timeout to connect to Libvirt server
-  #timeout: 1s
 
 #------------------------------ Logstash Module ------------------------------
 - module: logstash
   metricsets: ["node", "node_stats"]
-  enabled: true
+  enabled: false
   period: 10s
   hosts: ["localhost:9600"]
+
 
 #------------------------------ Memcached Module -----------------------------
 - module: memcached
   metricsets: ["stats"]
   period: 10s
   hosts: ["localhost:11211"]
-  enabled: true
 
 #------------------------------- MongoDB Module ------------------------------
 - module: mongodb
   metricsets: ["dbstats", "status"]
   period: 10s
-  enabled: true
 
   # The hosts must be passed as MongoDB URLs in the format:
   # [mongodb://][user:pass@]host[:port].
@@ -432,14 +337,6 @@ metricbeat.modules:
 
   # Password to use when connecting to MongoDB. Empty by default.
   #password: pass
-
-#-------------------------------- Munin Module -------------------------------
-- module: munin
-  metricsets: ["node"]
-  enabled: true
-  period: 10s
-  hosts: ["localhost:4949"]
-  node.namespace: node
 
 #-------------------------------- MySQL Module -------------------------------
 - module: mysql
@@ -461,28 +358,26 @@ metricbeat.modules:
   #raw: false
 
 #-------------------------------- Nginx Module -------------------------------
-- module: nginx
-  metricsets: ["stubstatus"]
-  enabled: true
-  period: 10s
+#- module: nginx
+  #metricsets: ["stubstatus"]
+  #enabled: true
+  #period: 10s
 
   # Nginx hosts
-  hosts: ["http://127.0.0.1"]
+  #hosts: ["http://127.0.0.1"]
 
   # Path to server status. Default server-status
-  server_status_path: "server-status"
+  #server_status_path: "server-status"
 
 #------------------------------- PHP_FPM Module ------------------------------
 - module: php_fpm
   metricsets: ["pool"]
-  enabled: true
   period: 10s
   status_path: "/status"
   hosts: ["localhost:8080"]
 
 #----------------------------- PostgreSQL Module -----------------------------
 - module: postgresql
-  enabled: true
   metricsets:
     # Stats about every PostgreSQL database
     - database
@@ -510,38 +405,23 @@ metricbeat.modules:
 #----------------------------- Prometheus Module -----------------------------
 - module: prometheus
   metricsets: ["stats"]
-  enabled: true
   period: 10s
   hosts: ["localhost:9090"]
-  #metrics_path: /metrics
-  #namespace: example
-
-- module: prometheus
-  metricsets: ["collector"]
-  enabled: true
-  period: 10s
-  hosts: ["localhost:9090"]
-  #metrics_path: /metrics
+  metrics_path: /metrics
   #namespace: example
 
 #------------------------------ RabbitMQ Module ------------------------------
 - module: rabbitmq
-  metricsets: ["node", "queue", "connection"]
-  enabled: true
+  metricsets: ["node", "queue"]
   period: 10s
   hosts: ["localhost:15672"]
 
-  # Management path prefix, if `management.path_prefix` is set in RabbitMQ
-  # configuration, it has to be set to the same value.
-  #management_path_prefix: ""
-
-  #username: guest
-  #password: guest
+  username: guest
+  password: guest
 
 #-------------------------------- Redis Module -------------------------------
 - module: redis
   metricsets: ["info", "keyspace"]
-  enabled: true
   period: 10s
 
   # Redis hosts
@@ -573,13 +453,11 @@ metricbeat.modules:
 #-------------------------------- uwsgi Module -------------------------------
 - module: uwsgi
   metricsets: ["status"]
-  enable: true
   period: 10s
   hosts: ["tcp://127.0.0.1:9191"]
 
 #------------------------------- vSphere Module ------------------------------
 - module: vsphere
-  enabled: true
   metricsets: ["datastore", "host", "virtualmachine"]
   period: 10s
   hosts: ["https://localhost/sdk"]
@@ -590,27 +468,20 @@ metricbeat.modules:
   insecure: false
   # Get custom fields when using virtualmachine metric set. Default false.
   # get_custom_fields: false
+  
 
 #------------------------------- Windows Module ------------------------------
 - module: windows
   metricsets: ["perfmon"]
-  enabled: true
   period: 10s
-  perfmon.ignore_non_existent_counters: true
   perfmon.counters:
-  #  - instance_label: processor.name
-  #    instance_name: total
-  #    measurement_label: processor.time.total.pct
-  #    query: '\Processor Information(_Total)\% Processor Time'
 
 - module: windows
   metricsets: ["service"]
-  enabled: true
   period: 60s
 
 #------------------------------ ZooKeeper Module -----------------------------
 - module: zookeeper
-  enabled: true
   metricsets: ["mntr"]
   period: 10s
   hosts: ["localhost:2181"]
@@ -652,74 +523,13 @@ metricbeat.modules:
 
     # Hints the minimum number of events stored in the queue,
     # before providing a batch of events to the outputs.
-    # The default value is set to 2048.
-    # A value of 0 ensures events are immediately available
+    # A value of 0 (the default) ensures events are immediately available
     # to be sent to the outputs.
     #flush.min_events: 2048
 
     # Maximum duration after which events are available to the outputs,
     # if the number of events stored in the queue is < min_flush_events.
     #flush.timeout: 1s
-
-  # The spool queue will store events in a local spool file, before
-  # forwarding the events to the outputs.
-  #
-  # Beta: spooling to disk is currently a beta feature. Use with care.
-  #
-  # The spool file is a circular buffer, which blocks once the file/buffer is full.
-  # Events are put into a write buffer and flushed once the write buffer
-  # is full or the flush_timeout is triggered.
-  # Once ACKed by the output, events are removed immediately from the queue,
-  # making space for new events to be persisted.
-  #spool:
-    # The file namespace configures the file path and the file creation settings.
-    # Once the file exists, the `size`, `page_size` and `prealloc` settings
-    # will have no more effect.
-    #file:
-      # Location of spool file. The default value is ${path.data}/spool.dat.
-      #path: "${path.data}/spool.dat"
-
-      # Configure file permissions if file is created. The default value is 0600.
-      #permissions: 0600
-
-      # File size hint. The spool blocks, once this limit is reached. The default value is 100 MiB.
-      #size: 100MiB
-
-      # The files page size. A file is split into multiple pages of the same size. The default value is 4KiB.
-      #page_size: 4KiB
-
-      # If prealloc is set, the required space for the file is reserved using
-      # truncate. The default value is true.
-      #prealloc: true
-
-    # Spool writer settings
-    # Events are serialized into a write buffer. The write buffer is flushed if:
-    # - The buffer limit has been reached.
-    # - The configured limit of buffered events is reached.
-    # - The flush timeout is triggered.
-    #write:
-      # Sets the write buffer size.
-      #buffer_size: 1MiB
-
-      # Maximum duration after which events are flushed, if the write buffer
-      # is not full yet. The default value is 1s.
-      #flush.timeout: 1s
-
-      # Number of maximum buffered events. The write buffer is flushed once the
-      # limit is reached.
-      #flush.events: 16384
-
-      # Configure the on-disk event encoding. The encoding can be changed
-      # between restarts.
-      # Valid encodings are: json, ubjson, and cbor.
-      #codec: cbor
-    #read:
-      # Reader flush timeout, waiting for more events to become available, so
-      # to fill a complete batch, as required by the outputs.
-      # If flush_timeout is 0, all available events are forwarded to the
-      # outputs immediately.
-      # The default value is 0s.
-      #flush.timeout: 0s
 
 # Sets the maximum number of CPUs that can be executing simultaneously. The
 # default is the number of logical CPUs available in the system.
@@ -755,22 +565,6 @@ metricbeat.modules:
 #       equals:
 #           http.code: 200
 #
-# The following example renames the field a to b:
-#
-#processors:
-#- rename:
-#    fields:
-#       - from: "a"
-#         to: "b"
-#
-# The following example tokenizes the string into fields:
-#
-#processors:
-#- dissect:
-#    tokenizer: "%{key1} - %{key2}"
-#    field: "message"
-#    target_prefix: "dissect"
-#
 # The following example enriches each event with metadata from the cloud
 # provider about the host machine. It works on EC2, GCE, DigitalOcean,
 # Tencent Cloud, and Alibaba Cloud.
@@ -795,7 +589,6 @@ metricbeat.modules:
 #    match_pids: ["process.pid", "process.ppid"]
 #    match_source: true
 #    match_source_index: 4
-#    match_short_id: false
 #    cleanup_timeout: 60
 #    # To connect to Docker over TLS you must specify a client and CA certificate.
 #    #ssl:
@@ -809,13 +602,6 @@ metricbeat.modules:
 #
 #processors:
 #- add_docker_metadata: ~
-#
-# The following example enriches each event with host metadata.
-#
-#processors:
-#- add_host_metadata:
-#   netinfo.enabled: false
-#
 
 #============================= Elastic Cloud ==================================
 
@@ -1305,10 +1091,6 @@ output.elasticsearch:
 # the default for the logs path is a logs subdirectory inside the home path.
 #path.logs: ${path.home}/logs
 
-#================================ Keystore ==========================================
-# Location of the Keystore containing the keys and their sensitive values.
-#keystore.path: "${path.config}/beats.keystore"
-
 #============================== Dashboards =====================================
 # These settings control loading the sample dashboards to the Kibana index. Loading
 # the dashboards are disabled by default and can be enabled either by setting the
@@ -1343,17 +1125,6 @@ output.elasticsearch:
 # how to install the dashboards by first querying Elasticsearch.
 #setup.dashboards.always_kibana: false
 
-# If true and Kibana is not reachable at the time when dashboards are loaded,
-# it will retry to reconnect to Kibana instead of exiting with an error.
-#setup.dashboards.retry.enabled: false
-
-# Duration interval between Kibana connection retries.
-#setup.dashboards.retry.interval: 1s
-
-# Maximum number of retries before exiting with an error, 0 for unlimited retrying.
-#setup.dashboards.retry.maximum: 0
-
-
 #============================== Template =====================================
 
 # A template is used to set the mapping in Elasticsearch
@@ -1374,15 +1145,6 @@ output.elasticsearch:
 
 # Path to fields.yml file to generate the template
 #setup.template.fields: "${path.config}/fields.yml"
-
-# Enable json template loading. If this is enabled, the fields.yml is ignored.
-#setup.template.json.enabled: false
-
-# Path to the json template file
-#setup.template.json.path: "${path.config}/template.json"
-
-# Name under which the template is stored in Elasticsearch
-#setup.template.json.name: ""
 
 # Overwrite existing template
 #setup.template.overwrite: false
@@ -1614,8 +1376,3 @@ logging.files:
 
 # Port on which the HTTP endpoint will bind. Default is 5066.
 #http.port: 5066
-
-#============================= Process Security ================================
-
-# Enable or disable seccomp system call filtering on Linux. Default is enabled.
-#seccomp.enabled: true

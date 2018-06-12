@@ -5,7 +5,7 @@ import unittest
 
 
 @unittest.skipUnless(re.match("(?i)win|linux|darwin|freebsd", sys.platform), "os")
-class Test(metricbeat.BaseTest):
+class TestProcessors(metricbeat.BaseTest):
 
     def test_drop_fields(self):
 
@@ -35,7 +35,7 @@ class Test(metricbeat.BaseTest):
         print(evt.keys())
         self.assertItemsEqual(self.de_dot([
             'beat', '@timestamp', 'system', 'metricset.module',
-            'metricset.rtt', 'metricset.name', 'host'
+            'metricset.rtt', 'metricset.name'
         ]), evt.keys())
         cpu = evt["system"]["cpu"]
         print(cpu.keys())
@@ -259,31 +259,3 @@ class Test(metricbeat.BaseTest):
             "system.process.memory.rss.pct"
         ]:
             assert key not in output
-
-    def test_rename_field(self):
-
-        self.render_config_template(
-            modules=[{
-                "name": "system",
-                "metricsets": ["cpu"],
-                "period": "1s"
-            }],
-            processors=[{
-                "rename": {
-                    "fields": [{"from": "metricset.name", "to": "hello.world"}],
-                },
-            }]
-        )
-        proc = self.start_beat()
-        self.wait_until(lambda: self.output_lines() > 0)
-        proc.check_kill_and_wait()
-
-        output = self.read_output_json()
-        self.assertEqual(len(output), 1)
-        evt = output[0]
-
-        print(evt)
-        print(evt.keys())
-
-        assert "name" not in output[0]["metricset"]
-        assert "cpu" in output[0]["hello"]["world"]

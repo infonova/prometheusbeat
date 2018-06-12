@@ -12,10 +12,10 @@ import (
 	mbtest "github.com/elastic/beats/metricbeat/mb/testing"
 )
 
-func TestFetchObject(t *testing.T) {
+func TestFetch(t *testing.T) {
 	compose.EnsureUp(t, "http")
 
-	f := mbtest.NewEventsFetcher(t, getConfig("object"))
+	f := mbtest.NewEventFetcher(t, getConfig())
 	event, err := f.Fetch()
 	if !assert.NoError(t, err) {
 		t.FailNow()
@@ -24,47 +24,23 @@ func TestFetchObject(t *testing.T) {
 	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(), event)
 }
 
-func TestFetchArray(t *testing.T) {
-	compose.EnsureUp(t, "http")
-
-	f := mbtest.NewEventsFetcher(t, getConfig("array"))
-	event, err := f.Fetch()
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
-
-	t.Logf("%s/%s event: %+v", f.Module().Name(), f.Name(), event)
-}
 func TestData(t *testing.T) {
 	compose.EnsureUp(t, "http")
 
-	f := mbtest.NewEventsFetcher(t, getConfig("object"))
-	err := mbtest.WriteEvents(f, t)
+	f := mbtest.NewEventFetcher(t, getConfig())
+	err := mbtest.WriteEvent(f, t)
 	if err != nil {
 		t.Fatal("write", err)
 	}
-
 }
 
-func getConfig(jsonType string) map[string]interface{} {
-	var path string
-	var responseIsArray bool
-	switch jsonType {
-	case "object":
-		path = "/jsonobj"
-		responseIsArray = false
-	case "array":
-		path = "/jsonarr"
-		responseIsArray = true
-	}
-
+func getConfig() map[string]interface{} {
 	return map[string]interface{}{
-		"module":        "http",
-		"metricsets":    []string{"json"},
-		"hosts":         []string{getEnvHost() + ":" + getEnvPort()},
-		"path":          path,
-		"namespace":     "testnamespace",
-		"json.is_array": responseIsArray,
+		"module":     "http",
+		"metricsets": []string{"json"},
+		"hosts":      []string{getEnvHost() + ":" + getEnvPort()},
+		"path":       "/",
+		"namespace":  "testnamespace",
 	}
 }
 

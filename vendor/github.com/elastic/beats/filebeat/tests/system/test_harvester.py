@@ -4,7 +4,6 @@ from filebeat import BaseTest
 import os
 import codecs
 import time
-import io
 
 """
 Test Harvesters
@@ -439,6 +438,7 @@ class Test(BaseTest):
 
         os.mkdir(self.working_dir + "/log/")
         self.copy_files(["logs/bom8.log"],
+                        source_dir="../files",
                         target_dir="log")
 
         filebeat = self.start_beat()
@@ -785,22 +785,18 @@ class Test(BaseTest):
         """
         self.render_config_template(
             path=os.path.abspath(self.working_dir) + "/log/*",
-            encoding="utf-16be",
+            encoding="GBK",  # Set invalid encoding for entry below which is actually uft-8
         )
 
         os.mkdir(self.working_dir + "/log/")
 
         logfile = self.working_dir + "/log/test.log"
 
-        with io.open(logfile, 'w', encoding="utf-16") as file:
-            file.write(u'hello world1')
-            file.write(u"\n")
-        with io.open(logfile, 'a', encoding="utf-16") as file:
-            file.write(u"\U00012345=Ra")
-        with io.open(logfile, 'a', encoding="utf-16") as file:
-            file.write(u"\n")
-            file.write(u"hello world2")
-            file.write(u"\n")
+        with open(logfile, 'w') as file:
+            file.write("hello world1" + "\n")
+
+            file.write('<meta content="瞭解「Google 商業解決方案」提供的各類服務軟件如何助您分析資料、刊登廣告、提升網站成效等。" name="description">' + '\n')
+            file.write("hello world2" + "\n")
 
         filebeat = self.start_beat()
 
@@ -811,7 +807,7 @@ class Test(BaseTest):
 
         # Wait until error shows up
         self.wait_until(
-            lambda: self.log_contains("Error decoding line: transform: short source buffer"),
+            lambda: self.log_contains("Error decoding line: simplifiedchinese: invalid GBK encoding"),
             max_timeout=5)
 
         filebeat.check_kill_and_wait()

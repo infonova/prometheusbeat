@@ -37,10 +37,8 @@ func mongodbModForTests() (*eventStore, *mongodbPlugin) {
 func testTCPTuple() *common.TCPTuple {
 	t := &common.TCPTuple{
 		IPLength: 4,
-		BaseTuple: common.BaseTuple{
-			SrcIP: net.IPv4(192, 168, 0, 1), DstIP: net.IPv4(192, 168, 0, 2),
-			SrcPort: 6512, DstPort: 27017,
-		},
+		SrcIP:    net.IPv4(192, 168, 0, 1), DstIP: net.IPv4(192, 168, 0, 2),
+		SrcPort: 6512, DstPort: 27017,
 	}
 	t.ComputeHashebles()
 	return t
@@ -334,18 +332,6 @@ func TestMaxDocSize(t *testing.T) {
 	res := expectTransaction(t, results)
 
 	assert.Equal(t, "\"1234 ...\n\"123\"\n\"12\"", res["response"])
-}
-
-func TestOpCodeNames(t *testing.T) {
-	for _, testData := range []struct {
-		code     int32
-		expected string
-	}{
-		{1, "OP_REPLY"},
-		{-1, "(value=-1)"},
-	} {
-		assert.Equal(t, testData.expected, opCode(testData.code).String())
-	}
 }
 
 // Test for a (recovered) panic parsing document length in request/response messages

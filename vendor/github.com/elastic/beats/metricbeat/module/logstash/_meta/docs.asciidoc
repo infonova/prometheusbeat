@@ -1,3 +1,2 @@
 This is the Logstash module.
 
-The default metricsets are `node` and `node_stats`.

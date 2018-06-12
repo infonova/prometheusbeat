@@ -23,9 +23,9 @@ var (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("prometheus", "stats", New,
-		mb.WithHostParser(hostParser),
-	)
+	if err := mb.Registry.AddMetricSet("prometheus", "stats", New, hostParser); err != nil {
+		panic(err)
+	}
 }
 
 type MetricSet struct {
@@ -36,13 +36,9 @@ type MetricSet struct {
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	cfgwarn.Beta("The prometheus stats metricset is beta")
 
-	http, err := helper.NewHTTP(base)
-	if err != nil {
-		return nil, err
-	}
 	return &MetricSet{
 		BaseMetricSet: base,
-		http:          http,
+		http:          helper.NewHTTP(base),
 	}, nil
 }
 

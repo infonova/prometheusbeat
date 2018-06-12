@@ -1,19 +1,16 @@
-// Licensed to Elasticsearch B.V. under one or more contributor
-// license agreements. See the NOTICE file distributed with
-// this work for additional information regarding copyright
-// ownership. Elasticsearch B.V. licenses this file to you under
-// the Apache License, Version 2.0 (the "License"); you may
-// not use this file except in compliance with the License.
+// Copyright 2017-2018 Elasticsearch Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package aucoalesce
 
@@ -28,7 +25,7 @@ import (
 
 var (
 	syscallNorms    map[string]*Normalization
-	recordTypeNorms map[string][]*Normalization
+	recordTypeNorms map[string]*Normalization
 )
 
 func init() {
@@ -72,7 +69,6 @@ type Normalization struct {
 	RecordTypes Strings        `yaml:"record_types"`
 	Syscalls    Strings        `yaml:"syscalls"`
 	SourceIP    Strings        `yaml:"source_ip"`
-	HasFields   Strings        `yaml:"has_fields"`
 }
 
 type SubjectMapping struct {
@@ -87,33 +83,32 @@ type ObjectMapping struct {
 	PathIndex          int     `yaml:"path_index"`
 }
 
-func LoadNormalizationConfig(b []byte) (syscalls map[string]*Normalization, recordTypes map[string][]*Normalization, err error) {
+type HowMapping struct {
+	FieldName string `yaml:"field"`
+}
+
+func LoadNormalizationConfig(b []byte) (syscalls map[string]*Normalization, recordTypes map[string]*Normalization, err error) {
 	c := &NormalizationConfig{}
 	if err := yaml.Unmarshal(b, c); err != nil {
 		return nil, nil, err
 	}
 
 	syscalls = map[string]*Normalization{}
-	recordTypes = map[string][]*Normalization{}
+	recordTypes = map[string]*Normalization{}
 
 	for i := range c.Normalizations {
 		norm := c.Normalizations[i]
 		for _, syscall := range norm.Syscalls.Values {
 			if _, found := syscalls[syscall]; found {
-				return nil, nil, fmt.Errorf("duplication mappings for syscall %v", syscall)
+				return nil, nil, fmt.Errorf("duplication mappings for sycall %v", syscall)
 			}
 			syscalls[syscall] = &norm
 		}
 		for _, recordType := range norm.RecordTypes.Values {
-			norms, found := recordTypes[recordType]
-			if found {
-				for _, n := range norms {
-					if len(n.HasFields.Values) == 0 {
-						return nil, nil, fmt.Errorf("duplication mappings for record_type %v without has_fields qualifier", recordType)
-					}
-				}
+			if _, found := recordTypes[recordType]; found {
+				return nil, nil, fmt.Errorf("duplication mappings for record_type %v", recordType)
 			}
-			recordTypes[recordType] = append(norms, &norm)
+			recordTypes[recordType] = &norm
 		}
 	}
 

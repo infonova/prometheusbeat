@@ -16,7 +16,7 @@ type Enabled struct {
 	Enabled bool `config:"enabled"`
 }
 
-func defaultKubernetesEventsConfig() kubeEventsConfig {
+func defaultKuberentesEventsConfig() kubeEventsConfig {
 	return kubeEventsConfig{
 		InCluster:  true,
 		SyncPeriod: 1 * time.Second,

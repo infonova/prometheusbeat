@@ -21,10 +21,9 @@ var (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("ceph", "pool_disk", New,
-		mb.WithHostParser(hostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("ceph", "pool_disk", New, hostParser); err != nil {
+		panic(err)
+	}
 }
 
 type MetricSet struct {
@@ -35,10 +34,7 @@ type MetricSet struct {
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	cfgwarn.Experimental("The ceph pool_disk metricset is experimental")
 
-	http, err := helper.NewHTTP(base)
-	if err != nil {
-		return nil, err
-	}
+	http := helper.NewHTTP(base)
 	http.SetHeader("Accept", "application/json")
 
 	return &MetricSet{

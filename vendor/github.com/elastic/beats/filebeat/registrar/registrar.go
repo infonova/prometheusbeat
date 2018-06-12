@@ -19,8 +19,7 @@ type Registrar struct {
 	Channel      chan []file.State
 	out          successLogger
 	done         chan struct{}
-	registryFile string      // Path to the Registry File
-	fileMode     os.FileMode // Permissions to apply on the Registry File
+	registryFile string // Path to the Registry File
 	wg           sync.WaitGroup
 
 	states               *file.States // Map with all file paths inside and the corresponding state
@@ -35,20 +34,15 @@ type successLogger interface {
 }
 
 var (
-	statesUpdate    = monitoring.NewInt(nil, "registrar.states.update")
-	statesCleanup   = monitoring.NewInt(nil, "registrar.states.cleanup")
-	statesCurrent   = monitoring.NewInt(nil, "registrar.states.current")
-	registryWrites  = monitoring.NewInt(nil, "registrar.writes.total")
-	registryFails   = monitoring.NewInt(nil, "registrar.writes.fail")
-	registrySuccess = monitoring.NewInt(nil, "registrar.writes.success")
+	statesUpdate   = monitoring.NewInt(nil, "registrar.states.update")
+	statesCleanup  = monitoring.NewInt(nil, "registrar.states.cleanup")
+	statesCurrent  = monitoring.NewInt(nil, "registrar.states.current")
+	registryWrites = monitoring.NewInt(nil, "registrar.writes")
 )
 
-// New creates a new Registrar instance, updating the registry file on
-// `file.State` updates. New fails if the file can not be opened or created.
-func New(registryFile string, fileMode os.FileMode, flushTimeout time.Duration, out successLogger) (*Registrar, error) {
+func New(registryFile string, flushTimeout time.Duration, out successLogger) (*Registrar, error) {
 	r := &Registrar{
 		registryFile: registryFile,
-		fileMode:     fileMode,
 		done:         make(chan struct{}),
 		states:       file.NewStates(),
 		Channel:      make(chan []file.State, 1),
@@ -130,11 +124,11 @@ func (r *Registrar) loadStates() error {
 }
 
 // resetStates sets all states to finished and disable TTL on restart
-// For all states covered by an input, TTL will be overwritten with the input value
+// For all states covered by a prospector, TTL will be overwritten with the prospector value
 func resetStates(states []file.State) []file.State {
 	for key, state := range states {
 		state.Finished = true
-		// Set ttl to -2 to easily spot which states are not managed by a input
+		// Set ttl to -2 to easily spot which states are not managed by a prospector
 		state.TTL = -2
 		states[key] = state
 	}
@@ -142,7 +136,7 @@ func resetStates(states []file.State) []file.State {
 }
 
 func (r *Registrar) Start() error {
-	// Load the previous log file locations now, for use in input
+	// Load the previous log file locations now, for use in prospector
 	err := r.loadStates()
 	if err != nil {
 		return fmt.Errorf("Error loading state: %v", err)
@@ -210,10 +204,8 @@ func (r *Registrar) onEvents(states []file.State) {
 	r.gcRequired = r.gcEnabled
 }
 
-// gcStates runs a registry Cleanup. The method check if more event in the
-// registry can be gc'ed in the future. If no potential removable state is found,
-// the gcEnabled flag is set to false, indicating the current registrar state being
-// stable. New registry update events can re-enable state gc'ing.
+// gcStates runs a registry Cleanup. The bool returned indicates wether more
+// events in the registry can be gc'ed in the future.
 func (r *Registrar) gcStates() {
 	if !r.gcRequired {
 		return
@@ -262,55 +254,36 @@ func (r *Registrar) flushRegistry() {
 
 // writeRegistry writes the new json registry file to disk.
 func (r *Registrar) writeRegistry() error {
-	// First clean up states
 	r.gcStates()
-	states := r.states.GetStates()
-	statesCurrent.Set(int64(len(states)))
 
-	registryWrites.Inc()
+	logp.Debug("registrar", "Write registry file: %s", r.registryFile)
 
-	tempfile, err := writeTmpFile(r.registryFile, r.fileMode, states)
-	if err != nil {
-		registryFails.Inc()
-		return err
-	}
-
-	err = helper.SafeFileRotate(r.registryFile, tempfile)
-	if err != nil {
-		registryFails.Inc()
-		return err
-	}
-
-	logp.Debug("registrar", "Registry file updated. %d states written.", len(states))
-	registrySuccess.Inc()
-
-	return nil
-}
-
-func writeTmpFile(baseName string, perm os.FileMode, states []file.State) (string, error) {
-	logp.Debug("registrar", "Write registry file: %s", baseName)
-
-	tempfile := baseName + ".new"
-	f, err := os.OpenFile(tempfile, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_SYNC, perm)
+	tempfile := r.registryFile + ".new"
+	f, err := os.OpenFile(tempfile, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_SYNC, 0600)
 	if err != nil {
 		logp.Err("Failed to create tempfile (%s) for writing: %s", tempfile, err)
-		return "", err
+		return err
 	}
 
-	defer f.Close()
+	// First clean up states
+	states := r.states.GetStates()
 
 	encoder := json.NewEncoder(f)
-
-	if err := encoder.Encode(states); err != nil {
+	err = encoder.Encode(states)
+	if err != nil {
+		f.Close()
 		logp.Err("Error when encoding the states: %s", err)
-		return "", err
+		return err
 	}
 
-	// Commit the changes to storage to avoid corrupt registry files
-	if err = f.Sync(); err != nil {
-		logp.Err("Error when syncing new registry file contents: %s", err)
-		return "", err
-	}
+	// Directly close file because of windows
+	f.Close()
 
-	return tempfile, nil
+	err = helper.SafeFileRotate(r.registryFile, tempfile)
+
+	logp.Debug("registrar", "Registry file updated. %d states written.", len(states))
+	registryWrites.Add(1)
+	statesCurrent.Set(int64(len(states)))
+
+	return err
 }

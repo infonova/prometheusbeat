@@ -1,25 +1,22 @@
 package info
 
 import (
-	"context"
-
-	"github.com/docker/docker/client"
-
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/docker"
+
+	dc "github.com/fsouza/go-dockerclient"
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("docker", "info", New,
-		mb.WithHostParser(docker.HostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("docker", "info", New, docker.HostParser); err != nil {
+		panic(err)
+	}
 }
 
 type MetricSet struct {
 	mb.BaseMetricSet
-	dockerClient *client.Client
+	dockerClient *dc.Client
 }
 
 // New create a new instance of the docker info MetricSet.
@@ -43,10 +40,10 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 // Fetch creates a new event for info.
 // See: https://docs.docker.com/engine/reference/api/docker_remote_api_v1.24/#/display-system-wide-information
 func (m *MetricSet) Fetch() (common.MapStr, error) {
-	info, err := m.dockerClient.Info(context.TODO())
+	info, err := m.dockerClient.Info()
 	if err != nil {
 		return nil, err
 	}
 
-	return eventMapping(&info), nil
+	return eventMapping(info), nil
 }

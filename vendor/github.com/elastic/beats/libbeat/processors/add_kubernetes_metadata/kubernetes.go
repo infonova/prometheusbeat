@@ -3,10 +3,12 @@ package add_kubernetes_metadata
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/bus"
 	"github.com/elastic/beats/libbeat/common/kubernetes"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/processors"
@@ -16,11 +18,19 @@ const (
 	timeout = time.Second * 5
 )
 
+var (
+	fatalError = errors.New("Unable to create kubernetes processor")
+)
+
 type kubernetesAnnotator struct {
-	watcher  kubernetes.Watcher
-	indexers *Indexers
-	matchers *Matchers
-	cache    *cache
+	sync.RWMutex
+	watcher        kubernetes.Watcher
+	startListener  bus.Listener
+	stopListener   bus.Listener
+	updateListener bus.Listener
+	indexers       *Indexers
+	matchers       *Matchers
+	metadata       map[string]common.MapStr
 }
 
 func init() {
@@ -28,7 +38,6 @@ func init() {
 
 	// Register default indexers
 	Indexing.AddIndexer(PodNameIndexerName, NewPodNameIndexer)
-	Indexing.AddIndexer(PodUIDIndexerName, NewPodUIDIndexer)
 	Indexing.AddIndexer(ContainerIndexerName, NewContainerIndexer)
 	Indexing.AddIndexer(IPPortIndexerName, NewIPPortIndexer)
 	Indexing.AddMatcher(FieldMatcherName, NewFieldMatcher)
@@ -66,11 +75,7 @@ func newKubernetesAnnotator(cfg *common.Config) (processors.Processor, error) {
 		Indexing.RUnlock()
 	}
 
-	metaGen, err := kubernetes.NewMetaGenerator(cfg)
-	if err != nil {
-		return nil, err
-	}
-
+	metaGen := kubernetes.NewMetaGenerator(config.IncludeAnnotations, config.IncludeLabels, config.ExcludeLabels)
 	indexers := NewIndexers(config.Indexers, metaGen)
 
 	matchers := NewMatchers(config.Matchers)
@@ -84,46 +89,36 @@ func newKubernetesAnnotator(cfg *common.Config) (processors.Processor, error) {
 		return nil, err
 	}
 
-	config.Host = kubernetes.DiscoverKubernetesNode(config.Host, config.InCluster, client)
+	config.Host = kubernetes.DiscoverKubernetesNode(config.Host, client)
 
 	logp.Debug("kubernetes", "Using host ", config.Host)
 	logp.Debug("kubernetes", "Initializing watcher")
+	if client != nil {
+		watcher := kubernetes.NewWatcher(client.CoreV1(), config.SyncPeriod, config.CleanupTimeout, config.Host)
+		start := watcher.ListenStart()
+		stop := watcher.ListenStop()
+		update := watcher.ListenUpdate()
 
-	watcher, err := kubernetes.NewWatcher(client, &kubernetes.Pod{}, kubernetes.WatchOptions{
-		SyncTimeout: config.SyncPeriod,
-		Node:        config.Host,
-		Namespace:   config.Namespace,
-	})
-	if err != nil {
-		logp.Err("kubernetes: Couldn't create watcher for %t", &kubernetes.Pod{})
-		return nil, err
+		processor := &kubernetesAnnotator{
+			watcher:        watcher,
+			indexers:       indexers,
+			matchers:       matchers,
+			metadata:       make(map[string]common.MapStr, 0),
+			startListener:  start,
+			stopListener:   stop,
+			updateListener: update,
+		}
+
+		// Start worker
+		go processor.worker()
+
+		if err := watcher.Start(); err != nil {
+			return nil, err
+		}
+		return processor, nil
 	}
 
-	processor := &kubernetesAnnotator{
-		watcher:  watcher,
-		indexers: indexers,
-		matchers: matchers,
-		cache:    newCache(config.CleanupTimeout),
-	}
-
-	watcher.AddEventHandler(kubernetes.ResourceEventHandlerFuncs{
-		AddFunc: func(obj kubernetes.Resource) {
-			processor.addPod(obj.(*kubernetes.Pod))
-		},
-		UpdateFunc: func(obj kubernetes.Resource) {
-			processor.removePod(obj.(*kubernetes.Pod))
-			processor.addPod(obj.(*kubernetes.Pod))
-		},
-		DeleteFunc: func(obj kubernetes.Resource) {
-			processor.removePod(obj.(*kubernetes.Pod))
-		},
-	})
-
-	if err := watcher.Start(); err != nil {
-		return nil, err
-	}
-
-	return processor, nil
+	return nil, fatalError
 }
 
 func (k *kubernetesAnnotator) Run(event *beat.Event) (*beat.Event, error) {
@@ -132,7 +127,9 @@ func (k *kubernetesAnnotator) Run(event *beat.Event) (*beat.Event, error) {
 		return event, nil
 	}
 
-	metadata := k.cache.get(index)
+	k.RLock()
+	metadata := k.metadata[index]
+	k.RUnlock()
 	if metadata == nil {
 		return event, nil
 	}
@@ -151,17 +148,48 @@ func (k *kubernetesAnnotator) Run(event *beat.Event) (*beat.Event, error) {
 	return event, nil
 }
 
+// worker watches pod events and keeps a map of metadata
+func (k *kubernetesAnnotator) worker() {
+	for {
+		select {
+		case event := <-k.startListener.Events():
+			processEvent(k.addPod, event)
+
+		case event := <-k.stopListener.Events():
+			processEvent(k.removePod, event)
+
+		case event := <-k.updateListener.Events():
+			processEvent(k.removePod, event)
+			processEvent(k.addPod, event)
+		}
+	}
+}
+
+// Run pod actions while handling errors
+func processEvent(f func(pod *kubernetes.Pod), event bus.Event) {
+	pod, ok := event["pod"].(*kubernetes.Pod)
+	if !ok || pod == nil {
+		logp.Err("Couldn't get a pod from watcher event: %v", event)
+		return
+	}
+	f(pod)
+}
+
 func (k *kubernetesAnnotator) addPod(pod *kubernetes.Pod) {
 	metadata := k.indexers.GetMetadata(pod)
+	k.Lock()
+	defer k.Unlock()
 	for _, m := range metadata {
-		k.cache.set(m.Index, m.Data)
+		k.metadata[m.Index] = m.Data
 	}
 }
 
 func (k *kubernetesAnnotator) removePod(pod *kubernetes.Pod) {
 	indexes := k.indexers.GetIndexes(pod)
+	k.Lock()
+	defer k.Unlock()
 	for _, idx := range indexes {
-		k.cache.delete(idx)
+		delete(k.metadata, idx)
 	}
 }
 

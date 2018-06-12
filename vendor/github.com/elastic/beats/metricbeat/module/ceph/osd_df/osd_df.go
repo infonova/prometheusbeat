@@ -21,10 +21,9 @@ var (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("ceph", "osd_df", New,
-		mb.WithHostParser(hostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("ceph", "osd_df", New, hostParser); err != nil {
+		panic(err)
+	}
 }
 
 type MetricSet struct {
@@ -35,10 +34,7 @@ type MetricSet struct {
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	cfgwarn.Beta("The ceph osd_df metricset is experimental")
 
-	http, err := helper.NewHTTP(base)
-	if err != nil {
-		return nil, err
-	}
+	http := helper.NewHTTP(base)
 	http.SetHeader("Accept", "application/json")
 
 	return &MetricSet{

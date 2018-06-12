@@ -1,11 +1,6 @@
-# Module: logstash
-# Docs: https://www.elastic.co/guide/en/beats/metricbeat/master/metricbeat-module-logstash.html
-
 - module: logstash
-  #metricsets:
-  #  - node
-  #  - node_stats
+  metricsets: ["node", "node_stats"]
+  enabled: false
   period: 10s
   hosts: ["localhost:9600"]
-  #username: "user"
-  #password: "secret"
+

@@ -33,7 +33,6 @@ var (
 		"POSINT":          "long",
 		"SYSLOGHOST":      "keyword",
 		"SYSLOGTIMESTAMP": "text",
-		"LOCALDATETIME":   "text",
 		"TIMESTAMP":       "text",
 		"USERNAME":        "keyword",
 		"WORD":            "keyword",
@@ -78,13 +77,6 @@ func newFieldYml(name, typeName string, noDoc bool) *fieldYml {
 func newField(lp string) field {
 	lp = lp[1 : len(lp)-1]
 	ee := strings.Split(lp, ":")
-	if len(ee) != 2 {
-		return field{
-			Type:     ee[0],
-			Elements: nil,
-		}
-	}
-
 	e := strings.Split(ee[1], ".")
 	return field{
 		Type:     ee[0],
@@ -128,9 +120,6 @@ func getElementsFromPatterns(patterns []string) ([]field, error) {
 		pp := r.FindAllString(lp, -1)
 		for _, p := range pp {
 			f := newField(p)
-			if f.Elements == nil {
-				continue
-			}
 			fs = addNewField(fs, f)
 		}
 
@@ -155,22 +144,8 @@ func accumulatePatterns(grok interface{}) ([]string, error) {
 func accumulateRemoveFields(remove interface{}, out []string) []string {
 	for k, v := range remove.(map[string]interface{}) {
 		if k == "field" {
-			switch vs := v.(type) {
-			case string:
-				return append(out, vs)
-			case []string:
-				for _, vv := range vs {
-					out = append(out, vv)
-				}
-			case []interface{}:
-				for _, vv := range vs {
-					vvs := vv.(string)
-					out = append(out, vvs)
-				}
-			default:
-				return out
-
-			}
+			vs := v.(string)
+			return append(out, vs)
 		}
 	}
 	return out
@@ -292,11 +267,7 @@ func generateField(out []*fieldYml, field field, index, count int, noDoc bool) [
 func generateFields(f []field, noDoc bool) []*fieldYml {
 	var out []*fieldYml
 	for _, ff := range f {
-		index := 1
-		if len(ff.Elements) == 1 {
-			index = 0
-		}
-		out = generateField(out, ff, index, len(ff.Elements), noDoc)
+		out = generateField(out, ff, 1, len(ff.Elements), noDoc)
 	}
 	return out
 }

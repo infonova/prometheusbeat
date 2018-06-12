@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"strconv"
-
 	"github.com/docker/libcompose/docker"
 	"github.com/docker/libcompose/docker/ctx"
 	"github.com/docker/libcompose/project"
@@ -37,30 +35,21 @@ type serviceInfo struct {
 var oldRegexp = regexp.MustCompile("minute")
 
 // EnsureUp starts all the requested services (must be defined in docker-compose.yml)
-// with a default timeout of 300 seconds
+// with a default timeout of 60 seconds
 func EnsureUp(t *testing.T, services ...string) {
-	EnsureUpWithTimeout(t, 300, services...)
+	EnsureUpWithTimeout(t, 60, services...)
 }
 
 // EnsureUpWithTimeout starts all the requested services (must be defined in docker-compose.yml)
 // Wait for `timeout` seconds for health
 func EnsureUpWithTimeout(t *testing.T, timeout int, services ...string) {
-	// The NO_COMPOSE env variables makes it possible to skip the starting of the environment.
-	// This is useful if the service is already running locally.
-	if noCompose, err := strconv.ParseBool(os.Getenv("NO_COMPOSE")); err == nil && noCompose {
-		return
-	}
-
 	compose, err := getComposeProject()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Kill no longer used containers
-	err = compose.KillOld(services)
-	if err != nil {
-		t.Fatal(err)
-	}
+	compose.KillOld(services)
 
 	for _, service := range services {
 		err = compose.Start(service)
@@ -128,22 +117,16 @@ func (c *composeProject) Wait(seconds int, services ...string) error {
 	return nil
 }
 
-func (c *composeProject) Kill(service string) error {
+func (c *composeProject) Kill(service string) {
 	c.Lock()
 	defer c.Unlock()
 
-	return c.p.Kill(context.Background(), "KILL", service)
+	c.p.Kill(context.Background(), "KILL", service)
 }
 
 func (c *composeProject) KillOld(except []string) error {
-	// Do not kill ourselves ;)
-	except = append(except, "beat")
-
-	// These services take very long to start up and stop. If they are stopped
-	// it can happen that an other package tries to start them at the same time
-	// which leads to a conflict. We need a better solution long term but that should
-	// solve the problem for now.
-	except = append(except, "elasticsearch", "kibana", "logstash")
+	// Do not kill ourselves or elasticsearch :)
+	except = append(except, "beat", "elasticsearch")
 
 	servicesStatus, err := c.getServices()
 	if err != nil {
@@ -157,10 +140,7 @@ func (c *composeProject) KillOld(except []string) error {
 		}
 
 		if s.Old {
-			err = c.Kill(s.Name)
-			if err != nil {
-				return err
-			}
+			c.Kill(s.Name)
 		}
 	}
 

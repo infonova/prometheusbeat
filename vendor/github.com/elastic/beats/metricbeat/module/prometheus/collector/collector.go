@@ -5,7 +5,7 @@ import (
 
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
-	p "github.com/elastic/beats/metricbeat/helper/prometheus"
+	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
 )
@@ -24,15 +24,14 @@ var (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("prometheus", "collector", New,
-		mb.WithHostParser(hostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("prometheus", "collector", New, hostParser); err != nil {
+		panic(err)
+	}
 }
 
 type MetricSet struct {
 	mb.BaseMetricSet
-	prometheus p.Prometheus
+	prometheus *helper.Prometheus
 	namespace  string
 }
 
@@ -47,14 +46,9 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 		return nil, err
 	}
 
-	prometheus, err := p.NewPrometheusClient(base)
-	if err != nil {
-		return nil, err
-	}
-
 	return &MetricSet{
 		BaseMetricSet: base,
-		prometheus:    prometheus,
+		prometheus:    helper.NewPrometheusClient(base),
 		namespace:     config.Namespace,
 	}, nil
 }

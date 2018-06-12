@@ -3,31 +3,44 @@ package queue
 import (
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
+	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
-	"github.com/elastic/beats/metricbeat/module/rabbitmq"
+	"github.com/elastic/beats/metricbeat/mb/parse"
+)
+
+const (
+	defaultScheme = "http"
+	defaultPath   = "/api/queues"
+)
+
+var (
+	hostParser = parse.URLHostParserBuilder{
+		DefaultScheme: defaultScheme,
+		DefaultPath:   defaultPath,
+	}.Build()
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("rabbitmq", "queue", New,
-		mb.WithHostParser(rabbitmq.HostParser),
-		mb.DefaultMetricSet(),
-	)
-}
-
-// MetricSet for fetching RabbitMQ queues metrics.
-type MetricSet struct {
-	*rabbitmq.MetricSet
-}
-
-// New creates new instance of MetricSet
-func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	cfgwarn.Beta("The rabbitmq queue metricset is beta")
-
-	ms, err := rabbitmq.NewMetricSet(base, rabbitmq.QueuesPath)
-	if err != nil {
-		return nil, err
+	if err := mb.Registry.AddMetricSet("rabbitmq", "queue", New, hostParser); err != nil {
+		panic(err)
 	}
-	return &MetricSet{ms}, nil
+}
+
+type MetricSet struct {
+	mb.BaseMetricSet
+	*helper.HTTP
+}
+
+func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
+	cfgwarn.Experimental("The rabbitmq queue metricset is experimental")
+
+	http := helper.NewHTTP(base)
+	http.SetHeader("Accept", "application/json")
+
+	return &MetricSet{
+		base,
+		http,
+	}, nil
 }
 
 func (m *MetricSet) Fetch() ([]common.MapStr, error) {

@@ -1,23 +1,15 @@
 package docker
 
 import (
-	"context"
-	"encoding/json"
-	"net/http"
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/tlsconfig"
-
-	"github.com/elastic/beats/libbeat/common/docker"
+	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
-)
 
-// Select Docker API version
-const dockerAPIVersion = "1.22"
+	"github.com/fsouza/go-dockerclient"
+)
 
 var HostParser = parse.URLHostParserBuilder{DefaultScheme: "tcp"}.Build()
 
@@ -41,34 +33,24 @@ func NewModule(base mb.BaseModule) (mb.Module, error) {
 }
 
 type Stat struct {
-	Container *types.Container
-	Stats     types.StatsJSON
+	Container docker.APIContainers
+	Stats     docker.Stats
 }
 
-// NewDockerClient initializes and returns a new Docker client
-func NewDockerClient(endpoint string, config Config) (*client.Client, error) {
-	var httpClient *http.Client
+func NewDockerClient(endpoint string, config Config) (*docker.Client, error) {
+	var err error
+	var client *docker.Client
 
-	if config.TLS.IsEnabled() {
-		options := tlsconfig.Options{
-			CAFile:   config.TLS.CA,
-			CertFile: config.TLS.Certificate,
-			KeyFile:  config.TLS.Key,
-		}
-
-		tlsc, err := tlsconfig.Client(options)
-		if err != nil {
-			return nil, err
-		}
-
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: tlsc,
-			},
-		}
+	if !config.TLS.IsEnabled() {
+		client, err = docker.NewClient(endpoint)
+	} else {
+		client, err = docker.NewTLSClient(
+			endpoint,
+			config.TLS.Certificate,
+			config.TLS.Key,
+			config.TLS.CA,
+		)
 	}
-
-	client, err := docker.NewClient(endpoint, httpClient, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -77,10 +59,8 @@ func NewDockerClient(endpoint string, config Config) (*client.Client, error) {
 }
 
 // FetchStats returns a list of running containers with all related stats inside
-func FetchStats(client *client.Client, timeout time.Duration) ([]Stat, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	containers, err := client.ContainerList(ctx, types.ContainerListOptions{})
+func FetchStats(client *docker.Client, timeout time.Duration) ([]Stat, error) {
+	containers, err := client.ListContainers(docker.ListContainersOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -92,9 +72,9 @@ func FetchStats(client *client.Client, timeout time.Duration) ([]Stat, error) {
 	wg.Add(len(containers))
 
 	for _, container := range containers {
-		go func(container types.Container) {
+		go func(container docker.APIContainers) {
 			defer wg.Done()
-			statsQueue <- exportContainerStats(ctx, client, &container)
+			statsQueue <- exportContainerStats(client, &container, timeout)
 		}(container)
 	}
 
@@ -119,18 +99,38 @@ func FetchStats(client *client.Client, timeout time.Duration) ([]Stat, error) {
 // This is currently very inefficient as docker calculates the average for each request,
 // means each request will take at least 2s: https://github.com/docker/docker/blob/master/cli/command/container/stats_helpers.go#L148
 // Getting all stats at once is implemented here: https://github.com/docker/docker/pull/25361
-func exportContainerStats(ctx context.Context, client *client.Client, container *types.Container) Stat {
+func exportContainerStats(client *docker.Client, container *docker.APIContainers, timeout time.Duration) Stat {
+	var wg sync.WaitGroup
 	var event Stat
-	event.Container = container
 
-	containerStats, err := client.ContainerStats(ctx, container.ID, false)
-	if err != nil {
-		return event
+	statsC := make(chan *docker.Stats)
+	errC := make(chan error, 1)
+	statsOptions := docker.StatsOptions{
+		ID:      container.ID,
+		Stats:   statsC,
+		Stream:  false,
+		Timeout: timeout,
 	}
 
-	defer containerStats.Body.Close()
-	decoder := json.NewDecoder(containerStats.Body)
-	decoder.Decode(&event.Stats)
-
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		errC <- client.Stats(statsOptions)
+		close(errC)
+	}()
+	go func() {
+		defer wg.Done()
+		stats := <-statsC
+		err := <-errC
+		if stats != nil && err == nil {
+			event.Stats = *stats
+			event.Container = *container
+		} else if err == nil && stats == nil {
+			logp.Warn("Container stopped when recovering stats: %v", container.ID)
+		} else {
+			logp.Err("An error occurred while getting docker stats: %v", err)
+		}
+	}()
+	wg.Wait()
 	return event
 }

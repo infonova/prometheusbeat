@@ -1,19 +1,16 @@
-// Licensed to Elasticsearch B.V. under one or more contributor
-// license agreements. See the NOTICE file distributed with
-// this work for additional information regarding copyright
-// ownership. Elasticsearch B.V. licenses this file to you under
-// the Apache License, Version 2.0 (the "License"); you may
-// not use this file except in compliance with the License.
+// Copyright 2017 Elasticsearch Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 // +build linux
 
@@ -24,7 +21,6 @@ import (
 	"encoding/binary"
 	"io"
 	"os"
-	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -82,7 +78,6 @@ type AuditClient struct {
 	Netlink         NetlinkSendReceiver
 	pendingAcks     []uint32
 	clearPIDOnClose bool
-	closeOnce       sync.Once
 }
 
 // NewMulticastAuditClient creates a new AuditClient that binds to the multicast
@@ -107,12 +102,7 @@ func newAuditClient(netlinkGroups uint32, resp io.Writer) (*AuditClient, error) 
 
 	netlink, err := NewNetlinkClient(syscall.NETLINK_AUDIT, netlinkGroups, buf, resp)
 	if err != nil {
-		switch err {
-		case syscall.EINVAL, syscall.EPROTONOSUPPORT, syscall.EAFNOSUPPORT:
-			return nil, errors.Wrap(err, "audit not supported by kernel")
-		default:
-			return nil, errors.Wrap(err, "failed to open audit netlink socket")
-		}
+		return nil, err
 	}
 
 	return &AuditClient{Netlink: netlink}, nil
@@ -120,8 +110,16 @@ func newAuditClient(netlinkGroups uint32, resp io.Writer) (*AuditClient, error) 
 
 // GetStatus returns the current status of the kernel's audit subsystem.
 func (c *AuditClient) GetStatus() (*AuditStatus, error) {
+	msg := syscall.NetlinkMessage{
+		Header: syscall.NlMsghdr{
+			Type:  AuditGet,
+			Flags: syscall.NLM_F_REQUEST | syscall.NLM_F_ACK,
+		},
+		Data: nil,
+	}
+
 	// Send AUDIT_GET message to the kernel.
-	seq, err := c.GetStatusAsync(true)
+	seq, err := c.Netlink.Send(msg)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed sending request")
 	}
@@ -152,30 +150,11 @@ func (c *AuditClient) GetStatus() (*AuditStatus, error) {
 	}
 
 	replyStatus := &AuditStatus{}
-	if err := replyStatus.FromWireFormat(reply.Data); err != nil {
+	if err := replyStatus.fromWireFormat(reply.Data); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal reply")
 	}
 
 	return replyStatus, nil
-}
-
-// GetStatusAsync sends a request for the status of the kernel's audit subsystem
-// and returns without waiting for a response.
-func (c *AuditClient) GetStatusAsync(requireACK bool) (seq uint32, err error) {
-	var flags uint16 = syscall.NLM_F_REQUEST
-	if requireACK {
-		flags |= syscall.NLM_F_ACK
-	}
-	msg := syscall.NetlinkMessage{
-		Header: syscall.NlMsghdr{
-			Type:  AuditGet,
-			Flags: flags,
-		},
-		Data: nil,
-	}
-
-	// Send AUDIT_GET message to the kernel.
-	return c.Netlink.Send(msg)
 }
 
 // GetRules returns a list of audit rules (in binary format).
@@ -369,23 +348,6 @@ func (c *AuditClient) SetFailure(fm FailureMode, wm WaitMode) error {
 	return c.set(status, wm)
 }
 
-// SetBacklogWaitTime sets the time that the kernel will wait for a buffer in
-// the backlog queue to become available before dropping the event. This has
-// the side-effect of blocking the thread that was invoking the syscall being
-// audited.
-// waitTime is measured in jiffies, default in kernel is 60*HZ (60 seconds).
-// A value of 0 disables the wait time completely, causing the failure mode
-// to be invoked immediately when the backlog queue is full.
-// Attempting to set a negative value or a value 10x larger than the default
-// will fail with EINVAL.
-func (c *AuditClient) SetBacklogWaitTime(waitTime int32, wm WaitMode) error {
-	status := AuditStatus{
-		Mask:            AuditStatusBacklogWaitTime,
-		BacklogWaitTime: uint32(waitTime),
-	}
-	return c.set(status, wm)
-}
-
 // RawAuditMessage is a raw audit message received from the kernel.
 type RawAuditMessage struct {
 	Type auparse.AuditMessageType
@@ -408,27 +370,16 @@ func (c *AuditClient) Receive(nonBlocking bool) (*RawAuditMessage, error) {
 	}, nil
 }
 
-// Close closes the AuditClient and frees any associated resources. If the audit
-// PID was set it will be cleared (set 0). Any invocations beyond the first
-// become no-ops.
+// Close closes the AuditClient and frees any associated resources.
 func (c *AuditClient) Close() error {
-	var err error
+	// Unregister from the kernel for a clean exit.
+	status := AuditStatus{
+		Mask: AuditStatusPID,
+		PID:  0,
+	}
+	c.set(status, NoWait)
 
-	// Only unregister and close the socket once.
-	c.closeOnce.Do(func() {
-		if c.clearPIDOnClose {
-			// Unregister from the kernel for a clean exit.
-			status := AuditStatus{
-				Mask: AuditStatusPID,
-				PID:  0,
-			}
-			c.set(status, NoWait)
-		}
-
-		err = c.Netlink.Close()
-	})
-
-	return err
+	return c.Netlink.Close()
 }
 
 // WaitForPendingACKs waits for acknowledgements messages for operations
@@ -559,20 +510,6 @@ const (
 	AuditStatusRateLimit
 	AuditStatusBacklogLimit
 	AuditStatusBacklogWaitTime
-	AuditStatusLost
-)
-
-// AuditFeatureBitmap is a mask used to indicate which features are currently
-// supported by the audit subsystem.
-type AuditFeatureBitmap uint32
-
-const (
-	AuditFeatureBitmapBacklogLimit = 1 << iota
-	AuditFeatureBitmapBacklogWaitTime
-	AuditFeatureBitmapExecutablePath
-	AuditFeatureBitmapExcludeExtend
-	AuditFeatureBitmapSessionIDFilter
-	AuditFeatureBitmapLostReset
 )
 
 var sizeofAuditStatus = int(unsafe.Sizeof(AuditStatus{}))
@@ -603,11 +540,11 @@ func (s AuditStatus) toWireFormat() []byte {
 	return buf.Bytes()
 }
 
-// FromWireFormat unmarshals the given buffer to an AuditStatus object. Due to
+// fromWireFormat unmarshals the given buffer to an AuditStatus object. Due to
 // changes in the audit_status struct in the kernel source this method does
 // not return an error if the buffer is smaller than the sizeof our AuditStatus
 // struct.
-func (s *AuditStatus) FromWireFormat(buf []byte) error {
+func (s *AuditStatus) fromWireFormat(buf []byte) error {
 	fields := []interface{}{
 		&s.Mask,
 		&s.Enabled,

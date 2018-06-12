@@ -1,6 +1,7 @@
 package node
 
 import (
+	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
@@ -10,10 +11,9 @@ import (
 // init registers the MetricSet with the central registry.
 // The New method will be called after the setup of the module and before starting to fetch data
 func init() {
-	mb.Registry.MustAddMetricSet("elasticsearch", "node", New,
-		mb.WithHostParser(hostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("elasticsearch", "node", New, hostParser); err != nil {
+		panic(err)
+	}
 }
 
 var (
@@ -35,25 +35,21 @@ type MetricSet struct {
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	cfgwarn.Beta("The elasticsearch node metricset is beta")
 
-	http, err := helper.NewHTTP(base)
-	if err != nil {
-		return nil, err
-	}
 	return &MetricSet{
 		base,
-		http,
+		helper.NewHTTP(base),
 	}, nil
 }
 
 // Fetch methods implements the data gathering and data conversion to the right format
 // It returns the event which is then forward to the output. In case of an error, a
 // descriptive error must be returned.
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 	content, err := m.http.FetchContent()
 	if err != nil {
-		r.Error(err)
-		return
+		return nil, err
 	}
 
-	eventsMapping(r, content)
+	events, _ := eventsMapping(content)
+	return events, nil
 }

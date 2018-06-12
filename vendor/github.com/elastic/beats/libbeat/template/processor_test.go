@@ -119,51 +119,6 @@ func TestProcessor(t *testing.T) {
 			},
 		},
 		{
-			output: p.keyword(&common.Field{Type: "keyword", MultiFields: common.Fields{common.Field{Name: "analyzed", Type: "text", Norms: true}}}),
-			expected: common.MapStr{
-				"type":         "keyword",
-				"ignore_above": 1024,
-				"fields": common.MapStr{
-					"analyzed": common.MapStr{
-						"type": "text",
-					},
-				},
-			},
-		},
-		{
-			output: p.keyword(&common.Field{Type: "keyword", IgnoreAbove: 256}),
-			expected: common.MapStr{
-				"type":         "keyword",
-				"ignore_above": 256,
-			},
-		},
-		{
-			output: p.keyword(&common.Field{Type: "keyword"}),
-			expected: common.MapStr{
-				"type":         "keyword",
-				"ignore_above": 1024,
-			},
-		},
-		{
-			output: p.text(&common.Field{Type: "text", MultiFields: common.Fields{
-				common.Field{Name: "raw", Type: "keyword"},
-				common.Field{Name: "indexed", Type: "text"},
-			}, Norms: true}),
-			expected: common.MapStr{
-				"type": "text",
-				"fields": common.MapStr{
-					"raw": common.MapStr{
-						"type":         "keyword",
-						"ignore_above": 1024,
-					},
-					"indexed": common.MapStr{
-						"type":  "text",
-						"norms": false,
-					},
-				},
-			},
-		},
-		{
 			output: p.text(&common.Field{Type: "text", MultiFields: common.Fields{
 				common.Field{Name: "raw", Type: "keyword"},
 				common.Field{Name: "indexed", Type: "text"},
@@ -219,12 +174,6 @@ func TestProcessor(t *testing.T) {
 			},
 		},
 		{
-			output: p.other(&common.Field{Type: "double", DocValues: &falseVar}),
-			expected: common.MapStr{
-				"type": "double", "doc_values": false,
-			},
-		},
-		{
 			output: p.other(&common.Field{Type: "text", DocValues: &trueVar}),
 			expected: common.MapStr{
 				"type": "text", "doc_values": true,
@@ -258,32 +207,6 @@ func TestDynamicTemplate(t *testing.T) {
 		},
 		{
 			field: common.Field{
-				Type: "object", ObjectType: "long", ObjectTypeMappingType: "futuretype",
-				Path: "language", Name: "english",
-			},
-			expected: common.MapStr{
-				"language.english": common.MapStr{
-					"mapping":            common.MapStr{"type": "long"},
-					"match_mapping_type": "futuretype",
-					"path_match":         "language.english.*",
-				},
-			},
-		},
-		{
-			field: common.Field{
-				Type: "object", ObjectType: "long", ObjectTypeMappingType: "*",
-				Path: "language", Name: "english",
-			},
-			expected: common.MapStr{
-				"language.english": common.MapStr{
-					"mapping":            common.MapStr{"type": "long"},
-					"match_mapping_type": "*",
-					"path_match":         "language.english.*",
-				},
-			},
-		},
-		{
-			field: common.Field{
 				Type: "object", ObjectType: "long",
 				Path: "language", Name: "english",
 			},
@@ -305,38 +228,6 @@ func TestDynamicTemplate(t *testing.T) {
 					"mapping":            common.MapStr{"type": "text"},
 					"match_mapping_type": "string",
 					"path_match":         "language.english.*",
-				},
-			},
-		},
-		{
-			field: common.Field{
-				Type: "object", ObjectType: "scaled_float",
-				Name: "core.*.pct",
-			},
-			expected: common.MapStr{
-				"core.*.pct": common.MapStr{
-					"mapping": common.MapStr{
-						"type":           "scaled_float",
-						"scaling_factor": defaultScalingFactor,
-					},
-					"match_mapping_type": "*",
-					"path_match":         "core.*.pct",
-				},
-			},
-		},
-		{
-			field: common.Field{
-				Type: "object", ObjectType: "scaled_float",
-				Name: "core.*.pct", ScalingFactor: 100, ObjectTypeMappingType: "float",
-			},
-			expected: common.MapStr{
-				"core.*.pct": common.MapStr{
-					"mapping": common.MapStr{
-						"type":           "scaled_float",
-						"scaling_factor": 100,
-					},
-					"match_mapping_type": "float",
-					"path_match":         "core.*.pct",
 				},
 			},
 		},
@@ -381,7 +272,7 @@ func TestPropertiesCombine(t *testing.T) {
 	}
 
 	p := Processor{EsVersion: *version}
-	err = p.Process(fields, "", output)
+	err = p.process(fields, "", output)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,7 +320,7 @@ func TestProcessNoName(t *testing.T) {
 	}
 
 	p := Processor{EsVersion: *version}
-	err = p.Process(fields, "", output)
+	err = p.process(fields, "", output)
 	if err != nil {
 		t.Fatal(err)
 	}

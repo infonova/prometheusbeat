@@ -152,10 +152,8 @@ func normalizeValue(value interface{}, keys ...string) (interface{}, []error) {
 	case []int, []int8, []int16, []int32, []int64:
 	case uint, uint8, uint16, uint32, uint64:
 	case []uint, []uint8, []uint16, []uint32, []uint64:
-	case float64:
+	case float32, float64:
 		return Float(value.(float64)), nil
-	case float32:
-		return Float(value.(float32)), nil
 	case []float32, []float64:
 	case complex64, complex128:
 	case []complex64, []complex128:
@@ -262,22 +260,16 @@ func DeDot(s string) string {
 // DeDotJSON replaces in keys all . with _
 // This helps when sending data to Elasticsearch to prevent object and key collisions.
 func DeDotJSON(json interface{}) interface{} {
-	switch json := json.(type) {
+	switch json.(type) {
 	case map[string]interface{}:
 		result := map[string]interface{}{}
-		for key, value := range json {
-			result[DeDot(key)] = DeDotJSON(value)
-		}
-		return result
-	case MapStr:
-		result := MapStr{}
-		for key, value := range json {
+		for key, value := range json.(map[string]interface{}) {
 			result[DeDot(key)] = DeDotJSON(value)
 		}
 		return result
 	case []interface{}:
-		result := make([]interface{}, len(json))
-		for i, value := range json {
+		result := make([]interface{}, len(json.([]interface{})))
+		for i, value := range json.([]interface{}) {
 			result[i] = DeDotJSON(value)
 		}
 		return result

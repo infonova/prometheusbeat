@@ -81,40 +81,32 @@ var (
 	}
 )
 
-type nodesStruct struct {
-	ClusterName string                            `json:"cluster_name"`
-	Nodes       map[string]map[string]interface{} `json:"nodes"`
-}
+func eventsMapping(content []byte) ([]common.MapStr, error) {
+	nodesStruct := struct {
+		ClusterName string                            `json:"cluster_name"`
+		Nodes       map[string]map[string]interface{} `json:"nodes"`
+	}{}
 
-func eventsMapping(r mb.ReporterV2, content []byte) []error {
+	json.Unmarshal(content, &nodesStruct)
 
-	nodeData := &nodesStruct{}
-	err := json.Unmarshal(content, nodeData)
-	if err != nil {
-		r.Error(err)
-		return []error{err}
-	}
+	var events []common.MapStr
+	errors := s.NewErrors()
 
-	var errs []error
-	for name, node := range nodeData.Nodes {
-		event := mb.Event{}
-
-		event.MetricSetFields, err = schema.Apply(node)
-		if err != nil {
-			errs = append(errs, err)
-		}
-
-		event.ModuleFields = common.MapStr{
+	for name, node := range nodesStruct.Nodes {
+		event, errs := schema.Apply(node)
+		// Write name here as full name only available as key
+		event[mb.ModuleDataKey] = common.MapStr{
 			"node": common.MapStr{
 				"name": name,
 			},
 			"cluster": common.MapStr{
-				"name": nodeData.ClusterName,
+				"name": nodesStruct.ClusterName,
 			},
 		}
-		event.RootFields = common.MapStr{}
-		event.RootFields.Put("service.name", "elasticsearch")
-		r.Event(event)
+		event[mb.NamespaceKey] = "node.stats"
+		events = append(events, event)
+		errors.AddErrors(errs)
 	}
-	return errs
+
+	return events, errors
 }

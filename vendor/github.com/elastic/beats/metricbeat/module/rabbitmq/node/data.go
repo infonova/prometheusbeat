@@ -3,9 +3,10 @@ package node
 import (
 	"encoding/json"
 
+	"github.com/elastic/beats/libbeat/common"
 	s "github.com/elastic/beats/libbeat/common/schema"
 	c "github.com/elastic/beats/libbeat/common/schema/mapstriface"
-	"github.com/elastic/beats/metricbeat/mb"
+	"github.com/elastic/beats/libbeat/logp"
 )
 
 var (
@@ -128,22 +129,26 @@ var (
 	}
 )
 
-func eventsMapping(r mb.ReporterV2, content []byte) {
+func eventsMapping(content []byte) ([]common.MapStr, error) {
 	var nodes []map[string]interface{}
 	err := json.Unmarshal(content, &nodes)
 	if err != nil {
-		r.Error(err)
-		return
+		logp.Err("Error: ", err)
 	}
+
+	events := []common.MapStr{}
+	errors := s.NewErrors()
 
 	for _, node := range nodes {
-		eventMapping(r, node)
+		event, errs := eventMapping(node)
+		events = append(events, event)
+		errors.AddErrors(errs)
+
 	}
+
+	return events, errors
 }
 
-func eventMapping(r mb.ReporterV2, node map[string]interface{}) {
-	event, _ := schema.Apply(node)
-	r.Event(mb.Event{
-		MetricSetFields: event,
-	})
+func eventMapping(node map[string]interface{}) (common.MapStr, *s.Errors) {
+	return schema.Apply(node)
 }

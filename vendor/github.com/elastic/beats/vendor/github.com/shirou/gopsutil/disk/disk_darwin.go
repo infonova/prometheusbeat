@@ -3,19 +3,14 @@
 package disk
 
 import (
-	"context"
 	"path"
+	"syscall"
 	"unsafe"
 
 	"github.com/shirou/gopsutil/internal/common"
-	"golang.org/x/sys/unix"
 )
 
 func Partitions(all bool) ([]PartitionStat, error) {
-	return PartitionsWithContext(context.Background(), all)
-}
-
-func PartitionsWithContext(ctx context.Context, all bool) ([]PartitionStat, error) {
 	var ret []PartitionStat
 
 	count, err := Getfsstat(nil, MntWait)
@@ -93,17 +88,13 @@ func PartitionsWithContext(ctx context.Context, all bool) ([]PartitionStat, erro
 }
 
 func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
-	return GetfsstatWithContext(context.Background(), buf, flags)
-}
-
-func GetfsstatWithContext(ctx context.Context, buf []Statfs_t, flags int) (n int, err error) {
 	var _p0 unsafe.Pointer
 	var bufsize uintptr
 	if len(buf) > 0 {
 		_p0 = unsafe.Pointer(&buf[0])
 		bufsize = unsafe.Sizeof(Statfs_t{}) * uintptr(len(buf))
 	}
-	r0, _, e1 := unix.Syscall(SYS_GETFSSTAT64, uintptr(_p0), bufsize, uintptr(flags))
+	r0, _, e1 := syscall.Syscall(SYS_GETFSSTAT64, uintptr(_p0), bufsize, uintptr(flags))
 	n = int(r0)
 	if e1 != 0 {
 		err = e1
@@ -111,6 +102,6 @@ func GetfsstatWithContext(ctx context.Context, buf []Statfs_t, flags int) (n int
 	return
 }
 
-func getFsType(stat unix.Statfs_t) string {
+func getFsType(stat syscall.Statfs_t) string {
 	return common.IntToString(stat.Fstypename[:])
 }

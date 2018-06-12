@@ -1,7 +1,6 @@
 package dashboards
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -25,7 +24,6 @@ const (
 // via the kibana dashboard loader plugin. For older versions of the Elastic Stack
 // we write the dashboards directly into the .kibana index.
 func ImportDashboards(
-	ctx context.Context,
 	beatName, hostname, homePath string,
 	kibanaConfig, esConfig, dashboardsConfig *common.Config,
 	msgOutputter MessageOutputter,
@@ -104,16 +102,16 @@ func ImportDashboards(
 	case importViaES:
 		return ImportDashboardsViaElasticsearch(esLoader)
 	case importViaKibana:
-		return setupAndImportDashboardsViaKibana(ctx, hostname, kibanaConfig, &dashConfig, msgOutputter)
+		return setupAndImportDashboardsViaKibana(hostname, kibanaConfig, &dashConfig, msgOutputter)
 	default:
 		return errors.New("Elasticsearch or Kibana configuration missing for loading dashboards.")
 	}
 }
 
-func setupAndImportDashboardsViaKibana(ctx context.Context, hostname string, kibanaConfig *common.Config,
+func setupAndImportDashboardsViaKibana(hostname string, kibanaConfig *common.Config,
 	dashboardsConfig *Config, msgOutputter MessageOutputter) error {
 
-	kibanaLoader, err := NewKibanaLoader(ctx, kibanaConfig, dashboardsConfig, hostname, msgOutputter)
+	kibanaLoader, err := NewKibanaLoader(kibanaConfig, dashboardsConfig, hostname, msgOutputter)
 	if err != nil {
 		return fmt.Errorf("fail to create the Kibana loader: %v", err)
 	}

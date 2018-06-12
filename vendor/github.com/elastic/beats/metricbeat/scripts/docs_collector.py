@@ -32,11 +32,11 @@ This file is generated! See scripts/docs_collector.py
         os.mkdir(os.path.abspath("docs") + "/modules/" + module)
 
         module_file = generated_note
-        module_meta_path = path + "/" + module + "/_meta"
+        beat_path = path + "/" + module + "/_meta"
 
         # Load module fields.yml
         module_fields = ""
-        with open(module_meta_path + "/fields.yml") as f:
+        with open(beat_path + "/fields.yml") as f:
             module_fields = yaml.load(f.read())
             module_fields = module_fields[0]
 
@@ -56,13 +56,9 @@ This file is generated! See scripts/docs_collector.py
         modules_list[module] = {}
         modules_list[module]["title"] = title
         modules_list[module]["release"] = release
-        modules_list[module]["dashboards"] = os.path.exists(module_meta_path + "/kibana")
         modules_list[module]["metricsets"] = {}
 
-        config_file = module_meta_path + "/config.reference.yml"
-
-        if os.path.isfile(config_file) == False:
-            config_file = module_meta_path + "/config.yml"
+        config_file = beat_path + "/config.yml"
 
         # Add example config file
         if os.path.isfile(config_file) == True:
@@ -89,9 +85,7 @@ in <<configuration-metricbeat>>. Here is an example configuration:
 
         # HTTP helper
         if 'ssl' in get_settings(module_fields):
-            module_file += "This module supports TLS connection when using `ssl`" + \
-                           " config field, as described in <<configuration-ssl>>." + \
-                           " It also supports the options described in <<module-http-config-options>>.\n\n"
+            module_file += "This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>.\n\n"
 
         # Add metricsets title as below each metricset adds its link
         module_file += "[float]\n"
@@ -183,8 +177,8 @@ For a description of each field in the metricset, see the
     module_list_output = generated_note
 
     module_list_output += '[options="header"]\n'
-    module_list_output += '|===================================\n'
-    module_list_output += '|Modules   |Dashboards   |Metricsets   \n'
+    module_list_output += '|========================\n'
+    module_list_output += '|Modules   |Metricsets   \n'
 
     for key, m in sorted(six.iteritems(modules_list)):
 
@@ -192,15 +186,11 @@ For a description of each field in the metricset, see the
         if m["release"] != "ga":
             release_label = m["release"] + "[]"
 
-        dashboard_no = "image:./images/icon-no.png[No prebuilt dashboards] "
-        dashboard_yes = "image:./images/icon-yes.png[Prebuilt dashboards are available] "
-        dashboards = dashboard_yes if m["dashboards"] else dashboard_no
-
-        module_list_output += '|{} {}   |{}   |{}  \n'.format("<<metricbeat-module-" + key + "," + m["title"] + ">> ",
-                                                              release_label, dashboards, "")
+        module_list_output += '|{} {}   |{}    \n'.format("<<metricbeat-module-" +
+                                                          key + "," + m["title"] + ">> ", release_label, "")
 
         # Make sure empty entry row spans over all metricset rows for this module
-        module_list_output += '.{}+| .{}+|  '.format(len(m["metricsets"]), len(m["metricsets"]))
+        module_list_output += '.{}+|   '.format(len(m["metricsets"]))
 
         for key, ms in sorted(six.iteritems(m["metricsets"])):
 

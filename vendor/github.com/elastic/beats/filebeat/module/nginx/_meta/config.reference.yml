@@ -7,9 +7,9 @@
     # Filebeat will choose the paths depending on your OS.
     #var.paths:
 
-    # Input configuration (advanced). Any input configuration option
+    # Prospector configuration (advanced). Any prospector configuration option
     # can be added under this section.
-    #input:
+    #prospector:
 
   # Error logs
   #error:
@@ -19,6 +19,6 @@
     # Filebeat will choose the paths depending on your OS.
     #var.paths:
 
-    # Input configuration (advanced). Any input configuration option
+    # Prospector configuration (advanced). Any prospector configuration option
     # can be added under this section.
-    #input:
+    #prospector:

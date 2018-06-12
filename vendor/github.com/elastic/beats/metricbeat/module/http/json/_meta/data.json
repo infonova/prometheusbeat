@@ -5,14 +5,15 @@
         "name": "host.example.com"
     },
     "http": {
-        "json": {
+        "testnamespace": {
             "hello": "world"
         }
     },
     "metricset": {
-        "host": "127.0.0.1:8080",
+        "host": "http:8080",
         "module": "http",
         "name": "json",
+        "namespace": "testnamespace",
         "rtt": 115
     }
 }

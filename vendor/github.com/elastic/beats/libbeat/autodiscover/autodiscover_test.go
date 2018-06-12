@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/cfgfile"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/bus"
@@ -40,11 +39,6 @@ func (m *mockRunner) Clone() *mockRunner {
 		stopped: m.stopped,
 	}
 }
-func (m *mockRunner) String() string {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	return "runner"
-}
 
 type mockAdapter struct {
 	mutex   sync.Mutex
@@ -62,7 +56,7 @@ func (m *mockAdapter) CheckConfig(*common.Config) error {
 	return nil
 }
 
-func (m *mockAdapter) Create(_ beat.Pipeline, config *common.Config, meta *common.MapStrPointer) (cfgfile.Runner, error) {
+func (m *mockAdapter) Create(config *common.Config, meta *common.MapStrPointer) (cfgfile.Runner, error) {
 	runner := &mockRunner{
 		config: config,
 		meta:   meta,
@@ -108,8 +102,8 @@ func TestNilAutodiscover(t *testing.T) {
 func TestAutodiscover(t *testing.T) {
 	// Register mock autodiscover provider
 	busChan := make(chan bus.Bus, 1)
-	Registry = NewRegistry()
-	Registry.AddProvider("mock", func(b bus.Bus, c *common.Config) (Provider, error) {
+	ProviderRegistry = NewRegistry()
+	ProviderRegistry.AddProvider("mock", func(b bus.Bus, c *common.Config) (Provider, error) {
 		// intercept bus to mock events
 		busChan <- b
 
@@ -133,7 +127,7 @@ func TestAutodiscover(t *testing.T) {
 	}
 
 	// Create autodiscover manager
-	autodiscover, err := NewAutodiscover("test", nil, &adapter, &config)
+	autodiscover, err := NewAutodiscover("test", &adapter, &config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,8 +205,8 @@ func TestAutodiscoverHash(t *testing.T) {
 	// Register mock autodiscover provider
 	busChan := make(chan bus.Bus, 1)
 
-	Registry = NewRegistry()
-	Registry.AddProvider("mock", func(b bus.Bus, c *common.Config) (Provider, error) {
+	ProviderRegistry = NewRegistry()
+	ProviderRegistry.AddProvider("mock", func(b bus.Bus, c *common.Config) (Provider, error) {
 		// intercept bus to mock events
 		busChan <- b
 
@@ -239,7 +233,7 @@ func TestAutodiscoverHash(t *testing.T) {
 	}
 
 	// Create autodiscover manager
-	autodiscover, err := NewAutodiscover("test", nil, &adapter, &config)
+	autodiscover, err := NewAutodiscover("test", &adapter, &config)
 	if err != nil {
 		t.Fatal(err)
 	}

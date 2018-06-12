@@ -10,7 +10,6 @@ import (
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/transport/tlscommon"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/monitoring"
 	"github.com/elastic/beats/libbeat/monitoring/report"
@@ -73,7 +72,7 @@ func makeReporter(beat beat.Info, cfg *common.Config) (report.Reporter, error) {
 	if proxyURL != nil {
 		logp.Info("Using proxy URL: %s", proxyURL)
 	}
-	tlsConfig, err := tlscommon.LoadTLSConfig(config.TLS)
+	tlsConfig, err := outputs.LoadTLSConfig(config.TLS)
 	if err != nil {
 		return nil, err
 	}
@@ -152,10 +151,8 @@ func (r *reporter) Stop() {
 }
 
 func (r *reporter) initLoop() {
-	debugf("Start monitoring endpoint init loop.")
-	defer debugf("Finish monitoring endpoint init loop.")
-
-	logged := false
+	logp.Info("Start monitoring endpoint init loop.")
+	defer logp.Info("Stop monitoring endpoint init loop.")
 
 	for {
 		// Select one configured endpoint by random and check if xpack is available
@@ -165,11 +162,7 @@ func (r *reporter) initLoop() {
 			closing(client)
 			break
 		} else {
-			if !logged {
-				logp.Info("Failed to connect to Elastic X-Pack Monitoring. Either Elasticsearch X-Pack monitoring is not enabled or Elasticsearch is not available. Will keep retrying.")
-				logged = true
-			}
-			debugf("Monitoring could not connect to elasticsearch, failed with %v", err)
+			logp.Err("Monitoring could not connect to elasticsearch, failed with %v", err)
 		}
 
 		select {
@@ -178,8 +171,6 @@ func (r *reporter) initLoop() {
 		case <-time.After(r.checkRetry):
 		}
 	}
-
-	logp.Info("Successfully connected to X-Pack Monitoring endpoint.")
 
 	// Start collector and send loop if monitoring endpoint has been found.
 	go r.snapshotLoop()

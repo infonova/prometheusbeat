@@ -12,7 +12,6 @@ import (
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
-	mbautodiscover "github.com/elastic/beats/metricbeat/autodiscover"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/module"
 
@@ -98,11 +97,6 @@ func newMetricbeat(b *beat.Beat, c *common.Config, options ...Option) (*Metricbe
 		applyOption(metricbeat)
 	}
 
-	if b.InSetupCmd {
-		// Return without instantiating the metricsets.
-		return metricbeat, nil
-	}
-
 	moduleOptions := append(
 		[]module.Option{module.WithMaxStartDelay(config.MaxStartDelay)},
 		metricbeat.moduleOptions...)
@@ -151,9 +145,9 @@ func newMetricbeat(b *beat.Beat, c *common.Config, options ...Option) (*Metricbe
 
 	if config.Autodiscover != nil {
 		var err error
-		factory := module.NewFactory(metricbeat.moduleOptions...)
-		adapter := mbautodiscover.NewAutodiscoverAdapter(factory)
-		metricbeat.autodiscover, err = autodiscover.NewAutodiscover("metricbeat", b.Publisher, adapter, config.Autodiscover)
+		factory := module.NewFactory(b.Publisher, metricbeat.moduleOptions...)
+		adapter := NewAutodiscoverAdapter(factory)
+		metricbeat.autodiscover, err = autodiscover.NewAutodiscover("metricbeat", adapter, config.Autodiscover)
 		if err != nil {
 			return nil, err
 		}
@@ -187,8 +181,8 @@ func (bt *Metricbeat) Run(b *beat.Beat) error {
 	}
 
 	if bt.config.ConfigModules.Enabled() {
-		moduleReloader := cfgfile.NewReloader(b.Publisher, bt.config.ConfigModules)
-		factory := module.NewFactory(bt.moduleOptions...)
+		moduleReloader := cfgfile.NewReloader(bt.config.ConfigModules)
+		factory := module.NewFactory(b.Publisher, bt.moduleOptions...)
 
 		if err := moduleReloader.Check(factory); err != nil {
 			return err

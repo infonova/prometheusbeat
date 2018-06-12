@@ -22,9 +22,9 @@ import (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("vsphere", "host", New,
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("vsphere", "host", New); err != nil {
+		panic(err)
+	}
 }
 
 type MetricSet struct {

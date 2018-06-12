@@ -17,8 +17,7 @@ def get_importable_lines(go_beat_path, import_line):
         imported_lines.append(module_import)
 
         module_path = join(path, module)
-        ignore = ["_meta", "vendor", "mtest"]
-        metricsets = [m for m in listdir(module_path) if isdir(join(module_path, m)) and m not in ignore]
+        metricsets = [m for m in listdir(module_path) if isdir(join(module_path, m)) and m not in ["_meta", "vendor"]]
         for metricset in metricsets:
             metricset_name = "{}/{}".format(module, metricset)
             metricset_import = import_line.format(beat_path=go_beat_path, module="module", name=metricset_name)

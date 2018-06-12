@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/winlogbeat/checkpoint"
 )
 
 type factory func(*common.Config) (EventLog, error)
@@ -26,8 +25,6 @@ func newTestEventLog(t *testing.T, factory factory, options map[string]interface
 
 func setupEventLog(t *testing.T, factory factory, recordID uint64, options map[string]interface{}) (EventLog, teardown) {
 	eventLog := newTestEventLog(t, factory, options)
-	fatalErr(t, eventLog.Open(checkpoint.EventLogState{
-		RecordNumber: recordID,
-	}))
+	fatalErr(t, eventLog.Open(recordID))
 	return eventLog, func() { fatalErr(t, eventLog.Close()) }
 }

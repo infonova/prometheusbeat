@@ -2,7 +2,7 @@
   title: "HTTP"
   description: >
     HTTP module
-  release: ga
+  release: beta
   settings: ["ssl"]
   fields:
     - name: http

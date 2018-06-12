@@ -2,16 +2,12 @@
 
 include::../../libbeat/docs/version.asciidoc[]
 
-include::{asciidoc-dir}/../../shared/attributes.asciidoc[]
+include::{asciidoc-dir}/../../shared/attributes62.asciidoc[]
 
 :version: {stack-version}
 :beatname_lc: winlogbeat
 :beatname_uc: Winlogbeat
 :beatname_pkg: {beatname_lc}
-:github_repo_name: beats
-:discuss_forum: beats/{beatname_lc}
-:beat_default_index_prefix: {beatname_lc}
-:has_ml_jobs: yes
 
 include::../../libbeat/docs/shared-beats-attributes.asciidoc[]
 
@@ -31,7 +27,9 @@ include::./fields.asciidoc[]
 
 include::../../libbeat/docs/monitoring/monitoring-beats.asciidoc[]
 
-include::../../libbeat/docs/shared-securing-beat.asciidoc[]
+include::./securing-winlogbeat.asciidoc[]
+
+include::../../libbeat/docs/security/securing-beats.asciidoc[]
 
 include::./troubleshooting.asciidoc[]
 

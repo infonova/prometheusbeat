@@ -82,7 +82,7 @@ func (e *eventLogger) run(
 		client.Close()
 	}()
 
-	err = api.Open(state)
+	err = api.Open(state.RecordNumber)
 	if err != nil {
 		logp.Warn("EventLog[%s] Open() error. No events will be read from "+
 			"this source. %v", api.Name(), err)

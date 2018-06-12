@@ -143,35 +143,36 @@ class Test(BaseTest):
     def nasa_logs(self):
 
         # Uncompress the nasa log file.
-        nasa_log = os.path.join(self.beat_path, "tests", "files", "logs", "nasa-50k.log")
+        nasa_log = '../files/logs/nasa-50k.log'
         if not os.path.isfile(nasa_log):
-            with gzip.open(nasa_log + ".gz", 'rb') as infile:
+            with gzip.open('../files/logs/nasa-50k.log.gz', 'rb') as infile:
                 with open(nasa_log, 'w') as outfile:
                     for line in infile:
                         outfile.write(line)
         os.mkdir(self.working_dir + "/log/")
         self.copy_files(["logs/nasa-50k.log"],
+                        source_dir="../files",
                         target_dir="log")
 
     def test_stopping_empty_path(self):
         """
-        Test filebeat stops properly when 1 input has an invalid config.
+        Test filebeat stops properly when 1 prospector has an invalid config.
         """
 
-        input_raw = """
+        prospector_raw = """
 - type: log
   paths: []
 """
 
         self.render_config_template(
             path=os.path.abspath(self.working_dir) + "/log/*",
-            input_raw=input_raw,
+            prospector_raw=prospector_raw,
         )
         filebeat = self.start_beat()
         time.sleep(2)
 
         # Wait until first flush
-        msg = "No paths were defined for input"
+        msg = "No paths were defined for prospector"
         self.wait_until(
             lambda: self.log_contains_count(msg) >= 1,
             max_timeout=5)

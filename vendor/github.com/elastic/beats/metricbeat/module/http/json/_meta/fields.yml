@@ -2,5 +2,5 @@
   type: group
   description: >
     json metricset
-  release: ga
+  release: beta
   fields:

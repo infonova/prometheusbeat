@@ -1,5 +1,4 @@
 filebeat.registry_file: {{ beat.working_dir + '/' }}{{ registryFile|default("registry")}}
-filebeat.overwrite_pipelines: true
 
 filebeat.config.modules:
   path: {{ beat.working_dir + '/modules.d/*.yml' }}

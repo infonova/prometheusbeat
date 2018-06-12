@@ -11,19 +11,13 @@
           type: text
           description: >
             Service url used by monitor.
-          multi_fields:
-          - name: raw
-            type: keyword
-            description: >
-              The service url used by monitor. This is a non-analyzed field that is useful
-              for aggregations.
 
         - name: response
           type: group
           description: >
             Service response parameters.
           fields:
-            - name: status_code
+            - name: status
               type: integer
               description: >
                 Response status code.

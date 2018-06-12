@@ -1,12 +1,12 @@
 package info
 
 import (
-	"github.com/docker/docker/api/types"
-
 	"github.com/elastic/beats/libbeat/common"
+
+	dc "github.com/fsouza/go-dockerclient"
 )
 
-func eventMapping(info *types.Info) common.MapStr {
+func eventMapping(info *dc.DockerInfo) common.MapStr {
 	event := common.MapStr{
 		"id": info.ID,
 		"containers": common.MapStr{

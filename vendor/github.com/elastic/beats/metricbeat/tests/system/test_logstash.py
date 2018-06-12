@@ -8,6 +8,8 @@ class Test(metricbeat.BaseTest):
 
     COMPOSE_SERVICES = ['logstash']
 
+    COMPOSE_TIMEOUT = 120
+
     @unittest.skipUnless(metricbeat.INTEGRATION_TESTS, "integration test")
     def test_node(self):
         """

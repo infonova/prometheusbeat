@@ -3,7 +3,7 @@
   description: >
     Golang module
   short_config: false
-  release: beta
+  release: experimental
   settings: ["ssl"]
   fields:
     - name: golang

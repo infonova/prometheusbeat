@@ -318,13 +318,19 @@ func (plugin *tlsPlugin) createEvent(conn *tlsConnectionData) beat.Event {
 	if tcptuple == nil {
 		tcptuple = server.tcptuple
 	}
-	cmdlineTuple := client.cmdlineTuple
-	if cmdlineTuple == nil {
-		cmdlineTuple = server.cmdlineTuple
+	if tcptuple != nil {
+		src.IP = tcptuple.SrcIP.String()
+		src.Port = tcptuple.SrcPort
+		dst.IP = tcptuple.DstIP.String()
+		dst.Port = tcptuple.DstPort
 	}
-	if tcptuple != nil && cmdlineTuple != nil {
-		source, destination := common.MakeEndpointPair(tcptuple.BaseTuple, cmdlineTuple)
-		src, dst = &source, &destination
+
+	if client.cmdlineTuple != nil {
+		src.Proc = string(client.cmdlineTuple.Src)
+		dst.Proc = string(client.cmdlineTuple.Dst)
+	} else if server.cmdlineTuple != nil {
+		src.Proc = string(server.cmdlineTuple.Dst)
+		dst.Proc = string(server.cmdlineTuple.Src)
 	}
 
 	if len(fingerprints) > 0 {

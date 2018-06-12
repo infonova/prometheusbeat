@@ -6,7 +6,8 @@ import (
 	"strings"
 
 	"github.com/joeshaw/multierror"
-	"github.com/prometheus/procfs"
+
+	"github.com/elastic/procfs"
 )
 
 // process tools

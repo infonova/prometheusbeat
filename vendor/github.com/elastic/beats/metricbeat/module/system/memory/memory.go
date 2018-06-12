@@ -12,10 +12,9 @@ import (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("system", "memory", New,
-		mb.WithHostParser(parse.EmptyHostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("system", "memory", New, parse.EmptyHostParser); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet for fetching system memory metrics.
@@ -66,26 +65,7 @@ func (m *MetricSet) Fetch() (event common.MapStr, err error) {
 		},
 		"free": swapStat.Free,
 	}
+
 	memory["swap"] = swap
-
-	hugePagesStat, err := mem.GetHugeTLBPages()
-	if err != nil {
-		return nil, errors.Wrap(err, "hugepages")
-	}
-	if hugePagesStat != nil {
-		mem.AddHugeTLBPagesPercentage(hugePagesStat)
-		memory["hugepages"] = common.MapStr{
-			"total": hugePagesStat.Total,
-			"used": common.MapStr{
-				"bytes": hugePagesStat.TotalAllocatedSize,
-				"pct":   hugePagesStat.UsedPercent,
-			},
-			"free":         hugePagesStat.Free,
-			"reserved":     hugePagesStat.Reserved,
-			"surplus":      hugePagesStat.Surplus,
-			"default_size": hugePagesStat.DefaultSize,
-		}
-	}
-
 	return memory, nil
 }

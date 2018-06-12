@@ -1,4 +1,0 @@
-== kvm module
-
-This is the kvm module.
-

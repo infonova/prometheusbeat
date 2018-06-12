@@ -29,9 +29,7 @@ func (r *JSON) decodeJSON(text []byte) ([]byte, common.MapStr) {
 
 	err := unmarshal(text, &jsonFields)
 	if err != nil || jsonFields == nil {
-		if !r.cfg.IgnoreDecodingError {
-			logp.Err("Error decoding JSON: %v", err)
-		}
+		logp.Err("Error decoding JSON: %v", err)
 		if r.cfg.AddErrorKey {
 			jsonFields = common.MapStr{"error": createJSONError(fmt.Sprintf("Error decoding JSON: %v", err))}
 		}
@@ -99,13 +97,6 @@ func MergeJSONFields(data common.MapStr, jsonFields common.MapStr, text *string,
 	// The message key might have been modified by multiline
 	if len(config.MessageKey) > 0 && text != nil {
 		jsonFields[config.MessageKey] = *text
-	}
-
-	// handle the case in which r.cfg.AddErrorKey is set and len(jsonFields) == 1
-	// and only thing it contains is `error` key due to error in json decoding
-	// which results in loss of message key in the main beat event
-	if len(jsonFields) == 1 && jsonFields["error"] != nil {
-		data["message"] = *text
 	}
 
 	if config.KeysUnderRoot {

@@ -48,7 +48,7 @@ func (s *States) UpdateWithTs(newState State, ts time.Time) {
 		// No existing state found, add new one
 		s.idx[id] = len(s.states)
 		s.states = append(s.states, newState)
-		logp.Debug("input", "New state added for %s", newState.Source)
+		logp.Debug("prospector", "New state added for %s", newState.Source)
 	}
 }
 

@@ -8,8 +8,7 @@ import (
 	"github.com/elastic/beats/libbeat/publisher/queue"
 )
 
-// QueueFactory is used to create a per test queue instance.
-type QueueFactory func(t *testing.T) queue.Queue
+type QueueFactory func() queue.Queue
 
 type workerFactory func(*sync.WaitGroup, interface{}, *TestLogger, queue.Queue) func()
 
@@ -50,7 +49,7 @@ func TestSingleProducerConsumer(
 			log := NewTestLogger(t)
 			log.Debug("run test: ", test.name)
 
-			queue := factory(t)
+			queue := factory()
 			defer func() {
 				err := queue.Close()
 				if err != nil {
@@ -193,7 +192,7 @@ func TestMultiProducerConsumer(
 			log := NewTestLogger(t)
 			log.Debug("run test: ", test.name)
 
-			queue := factory(t)
+			queue := factory()
 			defer func() {
 				err := queue.Close()
 				if err != nil {
@@ -264,7 +263,6 @@ func makeProducer(
 				ACK: ackCB,
 			})
 			for i := 0; i < maxEvents; i++ {
-				log.Debug("publish event", i)
 				producer.Publish(makeEvent(makeFields(i)))
 			}
 
@@ -290,7 +288,6 @@ func multiConsumer(numConsumers, maxEvents, batchSize int) workerFactory {
 				consumers[i] = b.Consumer()
 			}
 
-			log.Debugf("consumer: wait for %v events\n", maxEvents)
 			events.Add(maxEvents)
 
 			for _, c := range consumers {
@@ -306,10 +303,7 @@ func multiConsumer(numConsumers, maxEvents, batchSize int) workerFactory {
 							return
 						}
 
-						collected := batch.Events()
-						log.Debug("consumer: process batch", len(collected))
-
-						for range collected {
+						for range batch.Events() {
 							events.Done()
 						}
 						batch.ACK()

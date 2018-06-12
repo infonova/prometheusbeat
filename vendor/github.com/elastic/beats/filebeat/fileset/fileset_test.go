@@ -30,7 +30,7 @@ func TestLoadManifestNginx(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, manifest.ModuleVersion, "1.0")
 	assert.Equal(t, manifest.IngestPipeline, "ingest/default.json")
-	assert.Equal(t, manifest.Input, "config/nginx-access.yml")
+	assert.Equal(t, manifest.Prospector, "config/nginx-access.yml")
 
 	vars := manifest.Vars
 	assert.Equal(t, "paths", vars[0]["name"])
@@ -145,11 +145,11 @@ func TestResolveVariable(t *testing.T) {
 	}
 }
 
-func TestGetInputConfigNginx(t *testing.T) {
+func TestGetProspectorConfigNginx(t *testing.T) {
 	fs := getModuleForTesting(t, "nginx", "access")
 	assert.NoError(t, fs.Read("5.2.0"))
 
-	cfg, err := fs.getInputConfig()
+	cfg, err := fs.getProspectorConfig()
 	assert.NoError(t, err)
 
 	assert.True(t, cfg.HasField("paths"))
@@ -160,11 +160,11 @@ func TestGetInputConfigNginx(t *testing.T) {
 	assert.Equal(t, "filebeat-5.2.0-nginx-access-default", pipelineID)
 }
 
-func TestGetInputConfigNginxOverrides(t *testing.T) {
+func TestGetProspectorConfigNginxOverrides(t *testing.T) {
 	modulesPath, err := filepath.Abs("../module")
 	assert.NoError(t, err)
 	fs, err := New(modulesPath, "access", &ModuleConfig{Module: "nginx"}, &FilesetConfig{
-		Input: map[string]interface{}{
+		Prospector: map[string]interface{}{
 			"close_eof": true,
 		},
 	})
@@ -172,7 +172,7 @@ func TestGetInputConfigNginxOverrides(t *testing.T) {
 
 	assert.NoError(t, fs.Read("5.2.0"))
 
-	cfg, err := fs.getInputConfig()
+	cfg, err := fs.getProspectorConfig()
 	assert.NoError(t, err)
 
 	assert.True(t, cfg.HasField("paths"))

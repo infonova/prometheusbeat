@@ -22,7 +22,7 @@ setup: copy-vendor
 copy-vendor:
 	mkdir -p vendor/github.com/elastic/
 	cp -R ${GOPATH}/src/github.com/elastic/beats vendor/github.com/elastic/
-	rm -rf vendor/github.com/elastic/beats/.git vendor/github.com/elastic/beats/x-pack
+	rm -rf vendor/github.com/elastic/beats/.git
 
 # This is called by the beats packer before building starts
 .PHONY: before-build

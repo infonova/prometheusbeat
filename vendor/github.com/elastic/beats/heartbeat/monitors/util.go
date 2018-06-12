@@ -122,8 +122,6 @@ func annotated(
 		}
 
 		if fields != nil {
-			fields = fields.Clone()
-
 			status := look.Status(err)
 			fields.DeepUpdate(common.MapStr{
 				"monitor": common.MapStr{
@@ -132,7 +130,7 @@ func annotated(
 				},
 			})
 			if user := settings.Fields; user != nil {
-				fields.DeepUpdate(user.Clone())
+				fields.DeepUpdate(user)
 			}
 
 			event.Timestamp = start
@@ -372,13 +370,10 @@ func resolveErr(host string, err error) (common.MapStr, []TaskRunner, error) {
 func WithFields(fields common.MapStr, r TaskRunner) TaskRunner {
 	return MakeCont(func() (common.MapStr, []TaskRunner, error) {
 		event, cont, err := r.Run()
-		if event != nil {
-			event = event.Clone()
-			event.DeepUpdate(fields)
-		} else if err != nil {
+		if event == nil {
 			event = common.MapStr{}
-			event.DeepUpdate(fields)
 		}
+		event.DeepUpdate(fields)
 
 		for i := range cont {
 			cont[i] = WithFields(fields, cont[i])

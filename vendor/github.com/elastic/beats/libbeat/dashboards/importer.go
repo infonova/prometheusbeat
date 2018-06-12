@@ -71,7 +71,7 @@ func (imp Importer) ImportDashboard(file string) error {
 }
 
 func (imp Importer) ImportFile(fileType string, file string) error {
-	imp.loader.statusMsg("Import %s from %s", fileType, file)
+	imp.loader.statusMsg("Import %s from %s\n", fileType, file)
 
 	if fileType == "dashboard" {
 		return imp.loader.ImportDashboard(file)
@@ -118,16 +118,6 @@ func (imp Importer) unzip(archive, target string) error {
 	// Closure to close the files on each iteration
 	unzipFile := func(file *zip.File) error {
 		filePath := filepath.Join(target, file.Name)
-
-		// check that the resulting file path is indeed under target
-		// Note that Rel calls Clean.
-		relPath, err := filepath.Rel(target, filePath)
-		if err != nil {
-			return err
-		}
-		if strings.HasPrefix(filepath.ToSlash(relPath), "../") {
-			return fmt.Errorf("Zip file contains files outside of the target directory: %s", relPath)
-		}
 
 		if file.FileInfo().IsDir() {
 			return os.MkdirAll(filePath, file.Mode())
@@ -278,10 +268,8 @@ func (imp Importer) ImportKibanaDir(dir string) error {
 	if !imp.cfg.OnlyDashboards {
 		check = append(check, "index-pattern")
 	}
-	wantDashboards := false
 	if !imp.cfg.OnlyIndex {
 		check = append(check, "dashboard")
-		wantDashboards = true
 	}
 
 	types := []string{}
@@ -308,7 +296,7 @@ func (imp Importer) ImportKibanaDir(dir string) error {
 		}
 	}
 
-	if wantDashboards && !importDashboards {
+	if !importDashboards {
 		return fmt.Errorf("No dashboards to import. Please make sure the %s directory contains a dashboard directory.",
 			dir)
 	}

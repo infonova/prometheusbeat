@@ -3,7 +3,7 @@
   description: >
     Jolokia module
   short_config: false
-  release: ga
+  release: beta
   settings: ["ssl"]
   fields:
     - name: jolokia

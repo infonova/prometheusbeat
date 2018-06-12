@@ -7,8 +7,6 @@ This file is generated! See scripts/docs_collector.py
 
 This module periodically fetches metrics from http://redis.io/[Redis] servers.
 
-The defaut metricsets are `info` and `keyspace`.
-
 [float]
 === Module-specific configuration notes
 
@@ -44,7 +42,6 @@ in <<configuration-metricbeat>>. Here is an example configuration:
 metricbeat.modules:
 - module: redis
   metricsets: ["info", "keyspace"]
-  enabled: true
   period: 10s
 
   # Redis hosts

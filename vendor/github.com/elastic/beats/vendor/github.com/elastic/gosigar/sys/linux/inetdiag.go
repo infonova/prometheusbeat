@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/elastic/gosigar/sys"
 	"github.com/pkg/errors"
 )
 
@@ -115,10 +114,6 @@ const (
 	INET_DIAG_MARK
 )
 
-var (
-	byteOrder = sys.GetEndian()
-)
-
 // NetlinkInetDiag sends the given netlink request parses the responses with the
 // assumption that they are inet_diag_msgs. This will allocate a temporary
 // buffer for reading from the socket whose size will be the length of a page
@@ -199,11 +194,11 @@ done:
 func serialize(msg syscall.NetlinkMessage) []byte {
 	msg.Header.Len = uint32(syscall.SizeofNlMsghdr + len(msg.Data))
 	b := make([]byte, msg.Header.Len)
-	byteOrder.PutUint32(b[0:4], msg.Header.Len)
-	byteOrder.PutUint16(b[4:6], msg.Header.Type)
-	byteOrder.PutUint16(b[6:8], msg.Header.Flags)
-	byteOrder.PutUint32(b[8:12], msg.Header.Seq)
-	byteOrder.PutUint32(b[12:16], msg.Header.Pid)
+	binary.LittleEndian.PutUint32(b[0:4], msg.Header.Len)
+	binary.LittleEndian.PutUint16(b[4:6], msg.Header.Type)
+	binary.LittleEndian.PutUint16(b[6:8], msg.Header.Flags)
+	binary.LittleEndian.PutUint32(b[8:12], msg.Header.Seq)
+	binary.LittleEndian.PutUint32(b[12:16], msg.Header.Pid)
 	copy(b[16:], msg.Data)
 	return b
 }
@@ -228,7 +223,7 @@ type InetDiagReq struct {
 func (r InetDiagReq) toWireFormat() []byte {
 	buf := bytes.NewBuffer(make([]byte, sizeofInetDiagReq))
 	buf.Reset()
-	if err := binary.Write(buf, byteOrder, r); err != nil {
+	if err := binary.Write(buf, binary.LittleEndian, r); err != nil {
 		// This never returns an error.
 		panic(err)
 	}
@@ -269,7 +264,7 @@ type InetDiagReqV2 struct {
 func (r InetDiagReqV2) toWireFormat() []byte {
 	buf := bytes.NewBuffer(make([]byte, sizeofInetDiagReqV2))
 	buf.Reset()
-	if err := binary.Write(buf, byteOrder, r); err != nil {
+	if err := binary.Write(buf, binary.LittleEndian, r); err != nil {
 		// This never returns an error.
 		panic(err)
 	}
@@ -320,7 +315,7 @@ type InetDiagMsg struct {
 func ParseInetDiagMsg(b []byte) (*InetDiagMsg, error) {
 	r := bytes.NewReader(b)
 	inetDiagMsg := &InetDiagMsg{}
-	err := binary.Read(r, byteOrder, inetDiagMsg)
+	err := binary.Read(r, binary.LittleEndian, inetDiagMsg)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal inet_diag_msg")
 	}

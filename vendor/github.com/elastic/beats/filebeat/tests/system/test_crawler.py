@@ -573,15 +573,15 @@ class Test(BaseTest):
                 f.write(text + "\n")
 
         # create the config file
-        inputs = []
+        prospectors = []
         for enc_go, enc_py, _ in encodings:
-            inputs.append({
+            prospectors.append({
                 "path": self.working_dir + "/log/test-{}".format(enc_py),
                 "encoding": enc_go
             })
         self.render_config_template(
-            template_name="filebeat_inputs",
-            inputs=inputs
+            template_name="filebeat_prospectors",
+            prospectors=prospectors
         )
 
         # run filebeat

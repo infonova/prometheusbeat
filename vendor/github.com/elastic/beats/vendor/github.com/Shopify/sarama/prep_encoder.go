@@ -1,7 +1,6 @@
 package sarama
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 
@@ -9,7 +8,6 @@ import (
 )
 
 type prepEncoder struct {
-	stack  []pushEncoder
 	length int
 }
 
@@ -31,21 +29,12 @@ func (pe *prepEncoder) putInt64(in int64) {
 	pe.length += 8
 }
 
-func (pe *prepEncoder) putVarint(in int64) {
-	var buf [binary.MaxVarintLen64]byte
-	pe.length += binary.PutVarint(buf[:], in)
-}
-
 func (pe *prepEncoder) putArrayLength(in int) error {
 	if in > math.MaxInt32 {
 		return PacketEncodingError{fmt.Sprintf("array too long (%d)", in)}
 	}
 	pe.length += 4
 	return nil
-}
-
-func (pe *prepEncoder) putBool(in bool) {
-	pe.length++
 }
 
 // arrays
@@ -55,16 +44,11 @@ func (pe *prepEncoder) putBytes(in []byte) error {
 	if in == nil {
 		return nil
 	}
-	return pe.putRawBytes(in)
-}
-
-func (pe *prepEncoder) putVarintBytes(in []byte) error {
-	if in == nil {
-		pe.putVarint(-1)
-		return nil
+	if len(in) > math.MaxInt32 {
+		return PacketEncodingError{fmt.Sprintf("byteslice too long (%d)", len(in))}
 	}
-	pe.putVarint(int64(len(in)))
-	return pe.putRawBytes(in)
+	pe.length += len(in)
+	return nil
 }
 
 func (pe *prepEncoder) putRawBytes(in []byte) error {
@@ -73,14 +57,6 @@ func (pe *prepEncoder) putRawBytes(in []byte) error {
 	}
 	pe.length += len(in)
 	return nil
-}
-
-func (pe *prepEncoder) putNullableString(in *string) error {
-	if in == nil {
-		pe.length += 2
-		return nil
-	}
-	return pe.putString(*in)
 }
 
 func (pe *prepEncoder) putString(in string) error {
@@ -132,18 +108,10 @@ func (pe *prepEncoder) offset() int {
 // stackable
 
 func (pe *prepEncoder) push(in pushEncoder) {
-	in.saveOffset(pe.length)
 	pe.length += in.reserveLength()
-	pe.stack = append(pe.stack, in)
 }
 
 func (pe *prepEncoder) pop() error {
-	in := pe.stack[len(pe.stack)-1]
-	pe.stack = pe.stack[:len(pe.stack)-1]
-	if dpe, ok := in.(dynamicPushEncoder); ok {
-		pe.length += dpe.adjustLength(pe.length)
-	}
-
 	return nil
 }
 

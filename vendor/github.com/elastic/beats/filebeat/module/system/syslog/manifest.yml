@@ -17,4 +17,4 @@ var:
       value: false
 
 ingest_pipeline: ingest/pipeline.json
-input: config/syslog.yml
+prospector: config/syslog.yml

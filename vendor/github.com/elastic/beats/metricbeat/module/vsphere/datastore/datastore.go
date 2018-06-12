@@ -14,9 +14,9 @@ import (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("vsphere", "datastore", New,
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("vsphere", "datastore", New); err != nil {
+		panic(err)
+	}
 }
 
 type MetricSet struct {

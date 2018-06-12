@@ -14,9 +14,9 @@ import (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("system", "core", New,
-		mb.WithHostParser(parse.EmptyHostParser),
-	)
+	if err := mb.Registry.AddMetricSet("system", "core", New, parse.EmptyHostParser); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet for fetching system core metrics.

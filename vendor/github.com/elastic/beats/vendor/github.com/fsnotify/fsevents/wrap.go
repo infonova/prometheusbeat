@@ -1,4 +1,4 @@
-// +build darwin,go1.10
+// +build darwin
 
 package fsevents
 
@@ -109,14 +109,14 @@ func GetStreamRefPaths(f FSEventStreamRef) []string {
 // in the FSEvents database
 func GetDeviceUUID(deviceID int32) string {
 	uuid := C.FSEventsCopyUUIDForDevice(C.dev_t(deviceID))
-	if uuid == C.CFUUIDRef(0) {
+	if uuid == nil {
 		return ""
 	}
 	return cfStringToGoString(C.CFUUIDCreateString(nil, uuid))
 }
 
 func cfStringToGoString(cfs C.CFStringRef) string {
-	if cfs == 0 {
+	if cfs == nil {
 		return ""
 	}
 	cfStr := C.CFStringCreateCopy(nil, cfs)
@@ -173,7 +173,7 @@ func createPaths(paths []string) (C.CFArrayRef, error) {
 		defer C.free(unsafe.Pointer(cpath))
 
 		str := C.CFStringCreateWithCString(nil, cpath, C.kCFStringEncodingUTF8)
-		C.CFArrayAppendValue(C.CFMutableArrayRef(cPaths), unsafe.Pointer(str))
+		C.CFArrayAppendValue(cPaths, unsafe.Pointer(str))
 	}
 	var err error
 	if len(errs) > 0 {
@@ -229,8 +229,7 @@ func (es *EventStream) start(paths []string, callbackInfo uintptr) {
 	go func() {
 		runtime.LockOSThread()
 		es.rlref = CFRunLoopRef(C.CFRunLoopGetCurrent())
-		C.CFRetain(C.CFTypeRef(es.rlref))
-		C.FSEventStreamScheduleWithRunLoop(es.stream, C.CFRunLoopRef(es.rlref), C.kCFRunLoopDefaultMode)
+		C.FSEventStreamScheduleWithRunLoop(es.stream, es.rlref, C.kCFRunLoopDefaultMode)
 		C.FSEventStreamStart(es.stream)
 		close(started)
 		C.CFRunLoopRun()
@@ -266,6 +265,5 @@ func stop(stream FSEventStreamRef, rlref CFRunLoopRef) {
 	C.FSEventStreamStop(stream)
 	C.FSEventStreamInvalidate(stream)
 	C.FSEventStreamRelease(stream)
-	C.CFRunLoopStop(C.CFRunLoopRef(rlref))
-	C.CFRelease(C.CFTypeRef(rlref))
+	C.CFRunLoopStop(rlref)
 }

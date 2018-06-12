@@ -6,13 +6,14 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: filebeat
+    kubernetes.io/cluster-service: "true"
 data:
   filebeat.yml: |-
     filebeat.config:
-      inputs:
-        # Mounted `filebeat-inputs` configmap:
-        path: ${path.config}/inputs.d/*.yml
-        # Reload inputs configs as they change:
+      prospectors:
+        # Mounted `filebeat-prospectors` configmap:
+        path: ${path.config}/prospectors.d/*.yml
+        # Reload prospectors configs as they change:
         reload.enabled: false
       modules:
         path: ${path.config}/modules.d/*.yml
@@ -33,10 +34,11 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: filebeat-inputs
+  name: filebeat-prospectors
   namespace: kube-system
   labels:
     k8s-app: filebeat
+    kubernetes.io/cluster-service: "true"
 data:
   kubernetes.yml: |-
     - type: docker

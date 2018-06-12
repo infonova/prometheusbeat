@@ -463,10 +463,8 @@ func TestParseMySQL_splitResponse(t *testing.T) {
 func testTCPTuple() *common.TCPTuple {
 	t := &common.TCPTuple{
 		IPLength: 4,
-		BaseTuple: common.BaseTuple{
-			SrcIP: net.IPv4(192, 168, 0, 1), DstIP: net.IPv4(192, 168, 0, 2),
-			SrcPort: 6512, DstPort: 3306,
-		},
+		SrcIP:    net.IPv4(192, 168, 0, 1), DstIP: net.IPv4(192, 168, 0, 2),
+		SrcPort: 6512, DstPort: 3306,
 	}
 	t.ComputeHashebles()
 	return t

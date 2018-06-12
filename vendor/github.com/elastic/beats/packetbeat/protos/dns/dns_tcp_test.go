@@ -176,10 +176,8 @@ var (
 func testTCPTuple() *common.TCPTuple {
 	t := &common.TCPTuple{
 		IPLength: 4,
-		BaseTuple: common.BaseTuple{
-			SrcIP: net.IPv4(192, 168, 0, 1), DstIP: net.IPv4(192, 168, 0, 2),
-			SrcPort: clientPort, DstPort: serverPort,
-		},
+		SrcIP:    net.IPv4(192, 168, 0, 1), DstIP: net.IPv4(192, 168, 0, 2),
+		SrcPort: clientPort, DstPort: serverPort,
 	}
 	t.ComputeHashebles()
 	return t

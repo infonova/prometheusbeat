@@ -13,10 +13,9 @@ import (
 
 // init registers the MetricSet with the central registry.
 func init() {
-	mb.Registry.MustAddMetricSet("php_fpm", "pool", New,
-		mb.WithHostParser(hostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("php_fpm", "pool", New, HostParser); err != nil {
+		panic(err)
+	}
 }
 
 const (
@@ -24,8 +23,8 @@ const (
 	defaultPath   = "/status"
 )
 
-// hostParser is used for parsing the configured php-fpm hosts.
-var hostParser = parse.URLHostParserBuilder{
+// HostParser is used for parsing the configured php-fpm hosts.
+var HostParser = parse.URLHostParserBuilder{
 	DefaultScheme: defaultScheme,
 	DefaultPath:   defaultPath,
 	QueryParams:   "json",
@@ -42,13 +41,9 @@ type MetricSet struct {
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 	cfgwarn.Beta("The php_fpm pool metricset is beta")
 
-	http, err := helper.NewHTTP(base)
-	if err != nil {
-		return nil, err
-	}
 	return &MetricSet{
 		base,
-		http,
+		helper.NewHTTP(base),
 	}, nil
 }
 

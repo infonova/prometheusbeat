@@ -6,4 +6,4 @@ var:
       - test.log
 
 ingest_pipeline: ingest/default.json
-input: config/test.yml
+prospector: config/test.yml

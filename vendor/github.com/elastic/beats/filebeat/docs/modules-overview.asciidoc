@@ -1,16 +1,16 @@
 [[filebeat-modules-overview]]
 == Modules overview
 
-{beatname_uc} modules simplify the collection, parsing, and visualization of common
+Filebeat modules simplify the collection, parsing, and visualization of common
 log formats.
 
 A typical module (say, for the Nginx logs) is composed of one or
 more filesets (in the case of Nginx, `access` and `error`). A fileset contains
 the following:
 
-* {beatname_uc} input configurations, which contain the default paths where to
+* Filebeat prospector configurations, which contain the default paths where to
   look or the log files. These default paths depend on the operating system.
-  The {beatname_uc} configuration is also responsible with stitching together
+  The Filebeat configuration is also responsible with stitching together
   multiline events when needed.
 
 * Elasticsearch {elasticsearch}/ingest.html[Ingest Node] pipeline definition,
@@ -22,23 +22,23 @@ the following:
 
 * Sample Kibana dashboards, which can be used to visualize the log files.
 
-{beatname_uc} automatically adjusts these configurations based on your environment
+Filebeat automatically adjusts these configurations based on your environment
 and loads them to the respective Elastic stack components.
 
-NOTE: At the moment, {beatname_uc} modules require using the Elasticsearch
-{elasticsearch}/ingest.html[Ingest Node]. In the future, {beatname_uc} modules will
+NOTE: At the moment, Filebeat modules require using the Elasticsearch
+{elasticsearch}/ingest.html[Ingest Node]. In the future, Filebeat Modules will
 be able to also configure Logstash as a more powerful alternative to Ingest
 Node. For now, if you want to use Logstash, you can follow the steps described
 in the section called
-{logstashdoc}/filebeat-modules.html[Working with {beatname_uc} Modules] in the
+{logstashdoc}/filebeat-modules.html[Working with Filebeat Modules] in the
 Logstash Reference.
 
-{beatname_uc} modules require Elasticsearch 5.2 or later.
+Filebeat modules require Elasticsearch 5.2 or later.
 
 [float]
 === Get started
 
-To learn how to configure and run {beatname_uc} modules:
+To learn how to configure and run Filebeat modules:
 
 * Get started by reading <<filebeat-modules-quickstart>>.
 * Learn about the different ways to enable modules in <<configuration-filebeat-modules>>.

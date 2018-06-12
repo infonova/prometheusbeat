@@ -21,56 +21,19 @@ const (
 )
 
 type ProduceRequest struct {
-	TransactionalID *string
-	RequiredAcks    RequiredAcks
-	Timeout         int32
-	Version         int16 // v1 requires Kafka 0.9, v2 requires Kafka 0.10, v3 requires Kafka 0.11
-	records         map[string]map[int32]Records
-}
-
-func updateMsgSetMetrics(msgSet *MessageSet, compressionRatioMetric metrics.Histogram,
-	topicCompressionRatioMetric metrics.Histogram) int64 {
-	var topicRecordCount int64
-	for _, messageBlock := range msgSet.Messages {
-		// Is this a fake "message" wrapping real messages?
-		if messageBlock.Msg.Set != nil {
-			topicRecordCount += int64(len(messageBlock.Msg.Set.Messages))
-		} else {
-			// A single uncompressed message
-			topicRecordCount++
-		}
-		// Better be safe than sorry when computing the compression ratio
-		if messageBlock.Msg.compressedSize != 0 {
-			compressionRatio := float64(len(messageBlock.Msg.Value)) /
-				float64(messageBlock.Msg.compressedSize)
-			// Histogram do not support decimal values, let's multiple it by 100 for better precision
-			intCompressionRatio := int64(100 * compressionRatio)
-			compressionRatioMetric.Update(intCompressionRatio)
-			topicCompressionRatioMetric.Update(intCompressionRatio)
-		}
-	}
-	return topicRecordCount
-}
-
-func updateBatchMetrics(recordBatch *RecordBatch, compressionRatioMetric metrics.Histogram,
-	topicCompressionRatioMetric metrics.Histogram) int64 {
-	if recordBatch.compressedRecords != nil {
-		compressionRatio := int64(float64(recordBatch.recordsLen) / float64(len(recordBatch.compressedRecords)) * 100)
-		compressionRatioMetric.Update(compressionRatio)
-		topicCompressionRatioMetric.Update(compressionRatio)
-	}
-
-	return int64(len(recordBatch.Records))
+	RequiredAcks RequiredAcks
+	Timeout      int32
+	Version      int16 // v1 requires Kafka 0.9, v2 requires Kafka 0.10
+	msgSets      map[string]map[int32]*MessageSet
 }
 
 func (r *ProduceRequest) encode(pe packetEncoder) error {
-	if r.Version >= 3 {
-		if err := pe.putNullableString(r.TransactionalID); err != nil {
-			return err
-		}
-	}
 	pe.putInt16(int16(r.RequiredAcks))
 	pe.putInt32(r.Timeout)
+	err := pe.putArrayLength(len(r.msgSets))
+	if err != nil {
+		return err
+	}
 	metricRegistry := pe.metricRegistry()
 	var batchSizeMetric metrics.Histogram
 	var compressionRatioMetric metrics.Histogram
@@ -78,14 +41,9 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 		batchSizeMetric = getOrRegisterHistogram("batch-size", metricRegistry)
 		compressionRatioMetric = getOrRegisterHistogram("compression-ratio", metricRegistry)
 	}
+
 	totalRecordCount := int64(0)
-
-	err := pe.putArrayLength(len(r.records))
-	if err != nil {
-		return err
-	}
-
-	for topic, partitions := range r.records {
+	for topic, partitions := range r.msgSets {
 		err = pe.putString(topic)
 		if err != nil {
 			return err
@@ -99,11 +57,11 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 		if metricRegistry != nil {
 			topicCompressionRatioMetric = getOrRegisterTopicHistogram("compression-ratio", topic, metricRegistry)
 		}
-		for id, records := range partitions {
+		for id, msgSet := range partitions {
 			startOffset := pe.offset()
 			pe.putInt32(id)
 			pe.push(&lengthField{})
-			err = records.encode(pe)
+			err = msgSet.encode(pe)
 			if err != nil {
 				return err
 			}
@@ -112,10 +70,23 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 				return err
 			}
 			if metricRegistry != nil {
-				if r.Version >= 3 {
-					topicRecordCount += updateBatchMetrics(records.recordBatch, compressionRatioMetric, topicCompressionRatioMetric)
-				} else {
-					topicRecordCount += updateMsgSetMetrics(records.msgSet, compressionRatioMetric, topicCompressionRatioMetric)
+				for _, messageBlock := range msgSet.Messages {
+					// Is this a fake "message" wrapping real messages?
+					if messageBlock.Msg.Set != nil {
+						topicRecordCount += int64(len(messageBlock.Msg.Set.Messages))
+					} else {
+						// A single uncompressed message
+						topicRecordCount++
+					}
+					// Better be safe than sorry when computing the compression ratio
+					if messageBlock.Msg.compressedSize != 0 {
+						compressionRatio := float64(len(messageBlock.Msg.Value)) /
+							float64(messageBlock.Msg.compressedSize)
+						// Histogram do not support decimal values, let's multiple it by 100 for better precision
+						intCompressionRatio := int64(100 * compressionRatio)
+						compressionRatioMetric.Update(intCompressionRatio)
+						topicCompressionRatioMetric.Update(intCompressionRatio)
+					}
 				}
 				batchSize := int64(pe.offset() - startOffset)
 				batchSizeMetric.Update(batchSize)
@@ -137,15 +108,6 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 }
 
 func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
-	r.Version = version
-
-	if version >= 3 {
-		id, err := pd.getNullableString()
-		if err != nil {
-			return err
-		}
-		r.TransactionalID = id
-	}
 	requiredAcks, err := pd.getInt16()
 	if err != nil {
 		return err
@@ -161,8 +123,7 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 	if topicCount == 0 {
 		return nil
 	}
-
-	r.records = make(map[string]map[int32]Records)
+	r.msgSets = make(map[string]map[int32]*MessageSet)
 	for i := 0; i < topicCount; i++ {
 		topic, err := pd.getString()
 		if err != nil {
@@ -172,29 +133,28 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 		if err != nil {
 			return err
 		}
-		r.records[topic] = make(map[int32]Records)
-
+		r.msgSets[topic] = make(map[int32]*MessageSet)
 		for j := 0; j < partitionCount; j++ {
 			partition, err := pd.getInt32()
 			if err != nil {
 				return err
 			}
-			size, err := pd.getInt32()
+			messageSetSize, err := pd.getInt32()
 			if err != nil {
 				return err
 			}
-			recordsDecoder, err := pd.getSubset(int(size))
+			msgSetDecoder, err := pd.getSubset(int(messageSetSize))
 			if err != nil {
 				return err
 			}
-			var records Records
-			if err := records.decode(recordsDecoder); err != nil {
+			msgSet := &MessageSet{}
+			err = msgSet.decode(msgSetDecoder)
+			if err != nil {
 				return err
 			}
-			r.records[topic][partition] = records
+			r.msgSets[topic][partition] = msgSet
 		}
 	}
-
 	return nil
 }
 
@@ -212,41 +172,38 @@ func (r *ProduceRequest) requiredVersion() KafkaVersion {
 		return V0_9_0_0
 	case 2:
 		return V0_10_0_0
-	case 3:
-		return V0_11_0_0
 	default:
 		return minVersion
 	}
 }
 
-func (r *ProduceRequest) ensureRecords(topic string, partition int32) {
-	if r.records == nil {
-		r.records = make(map[string]map[int32]Records)
-	}
-
-	if r.records[topic] == nil {
-		r.records[topic] = make(map[int32]Records)
-	}
-}
-
 func (r *ProduceRequest) AddMessage(topic string, partition int32, msg *Message) {
-	r.ensureRecords(topic, partition)
-	set := r.records[topic][partition].msgSet
+	if r.msgSets == nil {
+		r.msgSets = make(map[string]map[int32]*MessageSet)
+	}
+
+	if r.msgSets[topic] == nil {
+		r.msgSets[topic] = make(map[int32]*MessageSet)
+	}
+
+	set := r.msgSets[topic][partition]
 
 	if set == nil {
 		set = new(MessageSet)
-		r.records[topic][partition] = newLegacyRecords(set)
+		r.msgSets[topic][partition] = set
 	}
 
 	set.addMessage(msg)
 }
 
 func (r *ProduceRequest) AddSet(topic string, partition int32, set *MessageSet) {
-	r.ensureRecords(topic, partition)
-	r.records[topic][partition] = newLegacyRecords(set)
-}
+	if r.msgSets == nil {
+		r.msgSets = make(map[string]map[int32]*MessageSet)
+	}
 
-func (r *ProduceRequest) AddBatch(topic string, partition int32, batch *RecordBatch) {
-	r.ensureRecords(topic, partition)
-	r.records[topic][partition] = newDefaultRecords(batch)
+	if r.msgSets[topic] == nil {
+		r.msgSets[topic] = make(map[int32]*MessageSet)
+	}
+
+	r.msgSets[topic][partition] = set
 }

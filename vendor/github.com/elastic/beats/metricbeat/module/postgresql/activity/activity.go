@@ -16,10 +16,9 @@ import (
 // init registers the MetricSet with the central registry.
 // The New method will be called after the setup of the module and before starting to fetch data
 func init() {
-	mb.Registry.MustAddMetricSet("postgresql", "activity", New,
-		mb.WithHostParser(postgresql.ParseURL),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("postgresql", "activity", New, postgresql.ParseURL); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet type defines all fields of the Postgresql MetricSet

@@ -3,28 +3,11 @@ package kubernetes
 import (
 	"encoding/json"
 	"strings"
-	"time"
 
-	"github.com/ericchiang/k8s"
-	"github.com/ericchiang/k8s/apis/core/v1"
+	"github.com/elastic/beats/libbeat/logp"
+
+	corev1 "github.com/ericchiang/k8s/api/v1"
 )
-
-func init() {
-	k8s.Register("", "v1", "events", true, &v1.Event{})
-	k8s.RegisterList("", "v1", "events", true, &v1.EventList{})
-}
-
-// Resource is kind of kubernetes resource like pod, event, etc...
-// It has a GetMetadata method for getting ObjectMeta which containing useful info like labels
-type Resource interface {
-	GetMetadata() *ObjectMeta
-}
-
-func resourceConverter(k8sObj k8s.Resource, r Resource) Resource {
-	bytes, _ := json.Marshal(k8sObj)
-	json.Unmarshal(bytes, r)
-	return r
-}
 
 type ObjectMeta struct {
 	Annotations       map[string]string `json:"annotations"`
@@ -68,7 +51,6 @@ type ContainerPort struct {
 
 type PodSpec struct {
 	Containers                    []Container `json:"containers"`
-	InitContainers                []Container `json:"initContainers"`
 	DNSPolicy                     string      `json:"dnsPolicy"`
 	NodeName                      string      `json:"nodeName"`
 	RestartPolicy                 string      `json:"restartPolicy"`
@@ -126,54 +108,32 @@ type Pod struct {
 	Status     PodStatus  `json:"status"`
 }
 
-// GetMetadata implements Resource
-func (p *Pod) GetMetadata() *ObjectMeta {
-	return &p.Metadata
-}
-
 // GetContainerID parses the container ID to get the actual ID string
 func (s *PodContainerStatus) GetContainerID() string {
-	cID, _ := s.GetContainerIDWithRuntime()
-	return cID
-}
-
-// GetContainerIDWithRuntime parses the container ID to get the actual ID string
-func (s *PodContainerStatus) GetContainerIDWithRuntime() (string, string) {
 	cID := s.ContainerID
 	if cID != "" {
-		parts := strings.Split(cID, "://")
+		parts := strings.Split(cID, "//")
 		if len(parts) == 2 {
-			return parts[1], parts[0]
+			return parts[1]
 		}
 	}
-	return "", ""
+	return ""
 }
 
-// Event is kubernetes event
-type Event struct {
-	APIVersion     string     `json:"apiVersion"`
-	Count          int64      `json:"count"`
-	FirstTimestamp *time.Time `json:"firstTimestamp"`
-	InvolvedObject struct {
-		APIVersion      string `json:"apiVersion"`
-		Kind            string `json:"kind"`
-		Name            string `json:"name"`
-		ResourceVersion string `json:"resourceVersion"`
-		UID             string `json:"uid"`
-	} `json:"involvedObject"`
-	Kind          string     `json:"kind"`
-	LastTimestamp *time.Time `json:"lastTimestamp"`
-	Message       string     `json:"message"`
-	Metadata      ObjectMeta `json:"metadata"`
-	Reason        string     `json:"reason"`
-	Source        struct {
-		Component string `json:"component"`
-		Host      string `json:"host"`
-	} `json:"source"`
-	Type string `json:"type"`
-}
+// GetPod converts Pod to our own type
+func GetPod(pod *corev1.Pod) *Pod {
+	bytes, err := json.Marshal(pod)
+	if err != nil {
+		logp.Warn("Unable to marshal %v", pod.String())
+		return nil
+	}
 
-// GetMetadata implements Resource
-func (e *Event) GetMetadata() *ObjectMeta {
-	return &e.Metadata
+	po := &Pod{}
+	err = json.Unmarshal(bytes, po)
+	if err != nil {
+		logp.Warn("Unable to marshal %v", pod.String())
+		return nil
+	}
+
+	return po
 }

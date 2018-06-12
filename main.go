@@ -4,8 +4,6 @@ import (
 	"os"
 
 	"github.com/infonova/prometheusbeat/cmd"
-
-	_ "github.com/infonova/prometheusbeat/include"
 )
 
 func main() {

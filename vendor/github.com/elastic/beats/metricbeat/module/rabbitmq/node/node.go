@@ -1,109 +1,55 @@
 package node
 
 import (
-	"encoding/json"
-
-	"github.com/pkg/errors"
-
+	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
+	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
-	"github.com/elastic/beats/metricbeat/module/rabbitmq"
+	"github.com/elastic/beats/metricbeat/mb/parse"
+)
+
+const (
+	defaultScheme = "http"
+	defaultPath   = "/api/nodes"
+)
+
+var (
+	hostParser = parse.URLHostParserBuilder{
+		DefaultScheme: defaultScheme,
+		DefaultPath:   defaultPath,
+	}.Build()
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("rabbitmq", "node", New,
-		mb.WithHostParser(rabbitmq.HostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("rabbitmq", "node", New, hostParser); err != nil {
+		panic(err)
+	}
 }
 
-// MetricSet for fetching RabbitMQ node metrics
 type MetricSet struct {
-	*rabbitmq.MetricSet
+	mb.BaseMetricSet
+	*helper.HTTP
 }
 
-// ClusterMetricSet is the MetricSet type used when node.collect is "all"
-type ClusterMetricSet struct {
-	*rabbitmq.MetricSet
-}
-
-// New creates new instance of MetricSet
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	cfgwarn.Beta("The rabbitmq node metricset is beta")
+	cfgwarn.Experimental("The rabbitmq node metricset is experimental")
 
-	config := defaultConfig
-	if err := base.Module().UnpackConfig(&config); err != nil {
-		return nil, err
-	}
+	http := helper.NewHTTP(base)
+	http.SetHeader("Accept", "application/json")
 
-	switch config.Collect {
-	case configCollectNode:
-		ms, err := rabbitmq.NewMetricSet(base, rabbitmq.OverviewPath)
-		if err != nil {
-			return nil, err
-		}
-
-		return &MetricSet{ms}, nil
-	case configCollectCluster:
-		ms, err := rabbitmq.NewMetricSet(base, rabbitmq.NodesPath)
-		if err != nil {
-			return nil, err
-		}
-
-		return &ClusterMetricSet{ms}, nil
-	default:
-		return nil, errors.Errorf("incorrect node.collect: %s", config.Collect)
-	}
+	return &MetricSet{
+		base,
+		http,
+	}, nil
 }
 
-type apiOverview struct {
-	Node string `json:"node"`
-}
-
-func (m *MetricSet) fetchOverview() (*apiOverview, error) {
-	d, err := m.HTTP.FetchContent()
-	if err != nil {
-		return nil, err
-	}
-
-	var apiOverview apiOverview
-	err = json.Unmarshal(d, &apiOverview)
-	if err != nil {
-		return nil, errors.Wrap(err, string(d))
-	}
-	return &apiOverview, nil
-}
-
-// Fetch metrics from rabbitmq node
-func (m *MetricSet) Fetch(r mb.ReporterV2) {
-	o, err := m.fetchOverview()
-	if err != nil {
-		r.Error(err)
-		return
-	}
-
-	node, err := rabbitmq.NewMetricSet(m.BaseMetricSet, rabbitmq.NodesPath+"/"+o.Node)
-	if err != nil {
-		r.Error(err)
-		return
-	}
-
-	content, err := node.HTTP.FetchJSON()
-	if err != nil {
-		r.Error(err)
-		return
-	}
-
-	eventMapping(r, content)
-}
-
-// Fetch metrics from all rabbitmq nodes in the cluster
-func (m *ClusterMetricSet) Fetch(r mb.ReporterV2) {
+func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 	content, err := m.HTTP.FetchContent()
+
 	if err != nil {
-		r.Error(err)
-		return
+		return nil, err
 	}
 
-	eventsMapping(r, content)
+	events, _ := eventsMapping(content)
+	return events, nil
 }

@@ -1,7 +1,5 @@
 This module periodically fetches metrics from http://redis.io/[Redis] servers.
 
-The defaut metricsets are `info` and `keyspace`.
-
 [float]
 === Module-specific configuration notes
 

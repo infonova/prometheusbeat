@@ -1,29 +1,22 @@
 package autodiscover
 
 import (
-	"time"
-
-	"github.com/pkg/errors"
-
 	"github.com/elastic/beats/libbeat/autodiscover/meta"
-	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/cfgfile"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/bus"
 	"github.com/elastic/beats/libbeat/logp"
+
+	"github.com/mitchellh/hashstructure"
 )
 
-const (
-	debugK = "autodiscover"
-
-	// If a config reload fails after a new event, a new reload will be run after this period
-	retryPeriod = 10 * time.Second
-)
+const debugK = "autodiscover"
 
 // TODO autodiscover providers config reload
 
 // Adapter must be implemented by the beat in order to provide Autodiscover
 type Adapter interface {
+	// TODO Hints
 
 	// CreateConfig generates a valid list of configs from the given event, the received event will have all keys defined by `StartFilter`
 	CreateConfig(bus.Event) ([]*common.Config, error)
@@ -41,41 +34,37 @@ type Adapter interface {
 // Autodiscover process, it takes a beat adapter and user config and runs autodiscover process, spawning
 // new modules when any configured providers does a match
 type Autodiscover struct {
-	bus             bus.Bus
-	defaultPipeline beat.Pipeline
-	adapter         Adapter
-	providers       []Provider
-	configs         map[uint64]*cfgfile.ConfigWithMeta
-	runners         *cfgfile.RunnerList
-	meta            *meta.Map
+	bus       bus.Bus
+	adapter   Adapter
+	providers []Provider
+	runners   *cfgfile.Registry
+	meta      *meta.Map
 
 	listener bus.Listener
 }
 
 // NewAutodiscover instantiates and returns a new Autodiscover manager
-func NewAutodiscover(name string, pipeline beat.Pipeline, adapter Adapter, config *Config) (*Autodiscover, error) {
+func NewAutodiscover(name string, adapter Adapter, config *Config) (*Autodiscover, error) {
 	// Init Event bus
 	bus := bus.New(name)
 
 	// Init providers
 	var providers []Provider
 	for _, providerCfg := range config.Providers {
-		provider, err := Registry.BuildProvider(bus, providerCfg)
+		provider, err := ProviderRegistry.BuildProvider(bus, providerCfg)
 		if err != nil {
-			return nil, errors.Wrap(err, "error in autodiscover provider settings")
+			return nil, err
 		}
 		logp.Debug(debugK, "Configured autodiscover provider: %s", provider)
 		providers = append(providers, provider)
 	}
 
 	return &Autodiscover{
-		bus:             bus,
-		defaultPipeline: pipeline,
-		adapter:         adapter,
-		configs:         map[uint64]*cfgfile.ConfigWithMeta{},
-		runners:         cfgfile.NewRunnerList("autodiscover", adapter, pipeline),
-		providers:       providers,
-		meta:            meta.NewMap(),
+		bus:       bus,
+		adapter:   adapter,
+		runners:   cfgfile.NewRegistry(),
+		providers: providers,
+		meta:      meta.NewMap(),
 	}, nil
 }
 
@@ -96,59 +85,38 @@ func (a *Autodiscover) Start() {
 }
 
 func (a *Autodiscover) worker() {
-	var updated, retry bool
-
-	for {
-		select {
-		case event := <-a.listener.Events():
-			// This will happen on Stop:
-			if event == nil {
-				return
-			}
-
-			if _, ok := event["start"]; ok {
-				updated = a.handleStart(event)
-			}
-			if _, ok := event["stop"]; ok {
-				updated = a.handleStop(event)
-			}
-
-		case <-time.After(retryPeriod):
+	for event := range a.listener.Events() {
+		// This will happen on Stop:
+		if event == nil {
+			return
 		}
 
-		if updated || retry {
-			if retry {
-				logp.Debug(debugK, "Reloading existing autodiscover configs after error")
-			}
-
-			configs := make([]*cfgfile.ConfigWithMeta, 0, len(a.configs))
-			for _, c := range a.configs {
-				configs = append(configs, c)
-			}
-
-			err := a.runners.Reload(configs)
-
-			// On error, make sure the next run also updates because some runners were not properly loaded
-			retry = err != nil
-			// reset updated status
-			updated = false
+		if _, ok := event["start"]; ok {
+			a.handleStart(event)
+		}
+		if _, ok := event["stop"]; ok {
+			a.handleStop(event)
 		}
 	}
 }
 
-func (a *Autodiscover) handleStart(event bus.Event) bool {
-	var updated bool
-
+func (a *Autodiscover) handleStart(event bus.Event) {
 	configs, err := a.adapter.CreateConfig(event)
 	if err != nil {
 		logp.Debug(debugK, "Could not generate config from event %v: %v", event, err)
-		return false
+		return
 	}
 	logp.Debug(debugK, "Got a start event: %v, generated configs: %+v", event, configs)
 
 	meta := getMeta(event)
 	for _, config := range configs {
-		hash, err := cfgfile.HashConfig(config)
+		rawCfg := map[string]interface{}{}
+		if err := config.Unpack(rawCfg); err != nil {
+			logp.Debug(debugK, "Error unpacking config: %v", err)
+			continue
+		}
+
+		hash, err := hashstructure.Hash(rawCfg, nil)
 		if err != nil {
 			logp.Debug(debugK, "Could not hash config %v: %v", config, err)
 			continue
@@ -168,28 +136,34 @@ func (a *Autodiscover) handleStart(event bus.Event) bool {
 			continue
 		}
 
-		a.configs[hash] = &cfgfile.ConfigWithMeta{
-			Config: config,
-			Meta:   &dynFields,
+		runner, err := a.adapter.Create(config, &dynFields)
+		if err != nil {
+			logp.Debug(debugK, "Failed to create runner with config %v: %v", config, err)
+			continue
 		}
-		updated = true
-	}
 
-	return updated
+		logp.Info("Autodiscover starting runner: %s", runner)
+		a.runners.Add(hash, runner)
+		runner.Start()
+	}
 }
 
-func (a *Autodiscover) handleStop(event bus.Event) bool {
-	var updated bool
-
+func (a *Autodiscover) handleStop(event bus.Event) {
 	configs, err := a.adapter.CreateConfig(event)
 	if err != nil {
 		logp.Debug(debugK, "Could not generate config from event %v: %v", event, err)
-		return false
+		return
 	}
 	logp.Debug(debugK, "Got a stop event: %v, generated configs: %+v", event, configs)
 
 	for _, config := range configs {
-		hash, err := cfgfile.HashConfig(config)
+		rawCfg := map[string]interface{}{}
+		if err := config.Unpack(rawCfg); err != nil {
+			logp.Debug(debugK, "Error unpacking config: %v", err)
+			continue
+		}
+
+		hash, err := hashstructure.Hash(rawCfg, nil)
 		if err != nil {
 			logp.Debug(debugK, "Could not hash config %v: %v", config, err)
 			continue
@@ -200,15 +174,14 @@ func (a *Autodiscover) handleStop(event bus.Event) bool {
 			continue
 		}
 
-		if a.runners.Has(hash) {
-			delete(a.configs, hash)
-			updated = true
+		if runner := a.runners.Get(hash); runner != nil {
+			logp.Info("Autodiscover stopping runner: %s", runner)
+			runner.Stop()
+			a.runners.Remove(hash)
 		} else {
 			logp.Debug(debugK, "Runner not found for stopping: %s", hash)
 		}
 	}
-
-	return updated
 }
 
 func getMeta(event bus.Event) common.MapStr {
@@ -241,6 +214,9 @@ func (a *Autodiscover) Stop() {
 	}
 
 	// Stop runners
-	a.runners.Stop()
+	for hash, runner := range a.runners.CopyList() {
+		runner.Stop()
+		a.meta.Remove(hash)
+	}
 	logp.Info("Stopped autodiscover manager")
 }

@@ -6,13 +6,14 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: filebeat
+    kubernetes.io/cluster-service: "true"
 data:
   filebeat.yml: |-
     filebeat.config:
-      inputs:
-        # Mounted `filebeat-inputs` configmap:
-        path: ${path.config}/inputs.d/*.yml
-        # Reload inputs configs as they change:
+      prospectors:
+        # Mounted `filebeat-prospectors` configmap:
+        path: ${path.config}/prospectors.d/*.yml
+        # Reload prospectors configs as they change:
         reload.enabled: false
       modules:
         path: ${path.config}/modules.d/*.yml
@@ -33,10 +34,11 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: filebeat-inputs
+  name: filebeat-prospectors
   namespace: kube-system
   labels:
     k8s-app: filebeat
+    kubernetes.io/cluster-service: "true"
 data:
   kubernetes.yml: |-
     - type: docker
@@ -53,17 +55,19 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: filebeat
+    kubernetes.io/cluster-service: "true"
 spec:
   template:
     metadata:
       labels:
         k8s-app: filebeat
+        kubernetes.io/cluster-service: "true"
     spec:
       serviceAccountName: filebeat
       terminationGracePeriodSeconds: 30
       containers:
       - name: filebeat
-        image: docker.elastic.co/beats/filebeat:7.0.0-alpha1
+        image: docker.elastic.co/beats/filebeat:6.2.3
         args: [
           "-c", "/etc/filebeat.yml",
           "-e",
@@ -94,8 +98,8 @@ spec:
           mountPath: /etc/filebeat.yml
           readOnly: true
           subPath: filebeat.yml
-        - name: inputs
-          mountPath: /usr/share/filebeat/inputs.d
+        - name: prospectors
+          mountPath: /usr/share/filebeat/prospectors.d
           readOnly: true
         - name: data
           mountPath: /usr/share/filebeat/data
@@ -110,13 +114,10 @@ spec:
       - name: varlibdockercontainers
         hostPath:
           path: /var/lib/docker/containers
-      - name: inputs
+      - name: prospectors
         configMap:
           defaultMode: 0600
-          name: filebeat-inputs
-      # We set an `emptyDir` here to ensure the manifest will deploy correctly.
-      # It's recommended to change this to a `hostPath` folder, to ensure internal data
-      # files survive pod changes (ie: version upgrade)
+          name: filebeat-prospectors
       - name: data
         emptyDir: {}
 ---

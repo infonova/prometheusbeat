@@ -269,7 +269,16 @@ func newTransaction(requ, resp *mongodbMessage) *transaction {
 
 		trans.cmdline = requ.cmdlineTuple
 		trans.ts = requ.ts
-		trans.src, trans.dst = common.MakeEndpointPair(requ.tcpTuple.BaseTuple, requ.cmdlineTuple)
+		trans.src = common.Endpoint{
+			IP:   requ.tcpTuple.SrcIP.String(),
+			Port: requ.tcpTuple.SrcPort,
+			Proc: string(requ.cmdlineTuple.Src),
+		}
+		trans.dst = common.Endpoint{
+			IP:   requ.tcpTuple.DstIP.String(),
+			Port: requ.tcpTuple.DstPort,
+			Proc: string(requ.cmdlineTuple.Dst),
+		}
 		if requ.direction == tcp.TCPDirectionReverse {
 			trans.src, trans.dst = trans.dst, trans.src
 		}

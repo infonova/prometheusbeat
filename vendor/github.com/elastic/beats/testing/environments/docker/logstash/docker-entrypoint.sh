@@ -15,6 +15,7 @@ readParams() {
 
   # Use default ports if not specified.
   : ${ES_PORT:=9200}
+  : ${REDIS_PORT:=6379}
 }
 
 es_url() {
@@ -57,8 +58,13 @@ waitForElasticsearch() {
   exit 1
 }
 
+updateConfigFile() {
+    sed -e "s/hosts.*/hosts => [\"$ES_HOST:$ES_PORT\"]/" /logstash.conf.tmpl > /logstash.conf
+}
+
 # Main
 
 readParams
+updateConfigFile
 waitForElasticsearch
 exec "$@"

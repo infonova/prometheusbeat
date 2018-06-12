@@ -39,7 +39,7 @@ SYSTEM_FILESYSTEM_FIELDS = ["available", "device_name", "type", "files", "free",
 SYSTEM_FSSTAT_FIELDS = ["count", "total_files", "total_size"]
 
 SYSTEM_MEMORY_FIELDS = ["swap", "actual.free", "free", "total", "used.bytes", "used.pct", "actual.used.bytes",
-                        "actual.used.pct", "hugepages"]
+                        "actual.used.pct"]
 
 SYSTEM_NETWORK_FIELDS = ["name", "out.bytes", "in.bytes", "out.packets",
                          "in.packets", "in.error", "out.error", "in.dropped", "out.dropped"]
@@ -49,7 +49,7 @@ SYSTEM_NETWORK_FIELDS = ["name", "out.bytes", "in.bytes", "out.packets",
 # is not available on all OSes and requires root to read for all processes.
 # cgroup is only available on linux.
 SYSTEM_PROCESS_FIELDS = ["cpu", "memory", "name", "pid", "ppid", "pgid",
-                         "state", "username"]
+                         "state", "username", "cgroup", "cwd"]
 
 
 class Test(metricbeat.BaseTest):
@@ -195,9 +195,8 @@ class Test(metricbeat.BaseTest):
 
         for evt in output:
             self.assert_fields_are_documented(evt)
-            if 'error' not in evt:
-                diskio = evt["system"]["diskio"]
-                self.assertItemsEqual(self.de_dot(SYSTEM_DISKIO_FIELDS), diskio.keys())
+            diskio = evt["system"]["diskio"]
+            self.assertItemsEqual(self.de_dot(SYSTEM_DISKIO_FIELDS), diskio.keys())
 
     @unittest.skipUnless(re.match("(?i)linux", sys.platform), "os")
     def test_diskio_linux(self):
@@ -289,9 +288,6 @@ class Test(metricbeat.BaseTest):
         self.assert_fields_are_documented(evt)
 
         memory = evt["system"]["memory"]
-        if not re.match("(?i)linux", sys.platform) and not "hugepages" in memory:
-            # Ensure presence of hugepages only in Linux
-            memory["hugepages"] = None
         self.assertItemsEqual(self.de_dot(SYSTEM_MEMORY_FIELDS), memory.keys())
 
         # Check that percentages are calculated.
@@ -366,13 +362,18 @@ class Test(metricbeat.BaseTest):
         """
         Test system/process output.
         """
+        if not sys.platform.startswith("linux") and "cgroup" in SYSTEM_PROCESS_FIELDS:
+            SYSTEM_PROCESS_FIELDS.remove("cgroup")
+
+        if not sys.platform.startswith("linux") and "cwd" in SYSTEM_PROCESS_FIELDS:
+            SYSTEM_PROCESS_FIELDS.remove("cwd")
+
         self.render_config_template(modules=[{
             "name": "system",
             "metricsets": ["process"],
             "period": "5s",
             "extras": {
-                "process.env.whitelist": ["PATH"],
-                "process.include_cpu_ticks": True,
+                "process.env.whitelist": ["PATH"]
             }
         }])
         proc = self.start_beat()
@@ -386,7 +387,6 @@ class Test(metricbeat.BaseTest):
         found_cmdline = False
         found_env = False
         found_fd = False
-        found_cwd = not sys.platform.startswith("linux")
         for evt in output:
             process = evt["system"]["process"]
 
@@ -395,23 +395,15 @@ class Test(metricbeat.BaseTest):
             if env is not None:
                 found_env = True
 
-            # Remove 'percpu' prior to checking documented fields because its keys are dynamic.
-            if "cgroup" in process and "cpuacct" in process["cgroup"]:
-                del process["cgroup"]["cpuacct"]["percpu"]
-
             self.assert_fields_are_documented(evt)
 
             # Remove optional keys.
-            process.pop("cgroup", None)
             cmdline = process.pop("cmdline", None)
             if cmdline is not None:
                 found_cmdline = True
             fd = process.pop("fd", None)
             if fd is not None:
                 found_fd = True
-            cwd = process.pop("cwd", None)
-            if cwd is not None:
-                found_cwd = True
 
             self.assertItemsEqual(SYSTEM_PROCESS_FIELDS, process.keys())
 

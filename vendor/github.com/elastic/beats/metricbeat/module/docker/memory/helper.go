@@ -19,25 +19,24 @@ type MemoryData struct {
 
 type MemoryService struct{}
 
-func (s *MemoryService) getMemoryStatsList(rawStats []docker.Stat, dedot bool) []MemoryData {
+func (s *MemoryService) getMemoryStatsList(rawStats []docker.Stat) []MemoryData {
 	formattedStats := []MemoryData{}
 	for _, myRawStats := range rawStats {
-		formattedStats = append(formattedStats, s.getMemoryStats(myRawStats, dedot))
+		formattedStats = append(formattedStats, s.GetMemoryStats(myRawStats))
 	}
 
 	return formattedStats
 }
 
-func (s *MemoryService) getMemoryStats(myRawStat docker.Stat, dedot bool) MemoryData {
-	totalRSS := myRawStat.Stats.MemoryStats.Stats["total_rss"]
+func (s *MemoryService) GetMemoryStats(myRawStat docker.Stat) MemoryData {
 	return MemoryData{
 		Time:      common.Time(myRawStat.Stats.Read),
-		Container: docker.NewContainer(myRawStat.Container, dedot),
+		Container: docker.NewContainer(&myRawStat.Container),
 		Failcnt:   myRawStat.Stats.MemoryStats.Failcnt,
 		Limit:     myRawStat.Stats.MemoryStats.Limit,
 		MaxUsage:  myRawStat.Stats.MemoryStats.MaxUsage,
-		TotalRss:  totalRSS,
-		TotalRssP: float64(totalRSS) / float64(myRawStat.Stats.MemoryStats.Limit),
+		TotalRss:  myRawStat.Stats.MemoryStats.Stats.TotalRss,
+		TotalRssP: float64(myRawStat.Stats.MemoryStats.Stats.TotalRss) / float64(myRawStat.Stats.MemoryStats.Limit),
 		Usage:     myRawStat.Stats.MemoryStats.Usage,
 		UsageP:    float64(myRawStat.Stats.MemoryStats.Usage) / float64(myRawStat.Stats.MemoryStats.Limit),
 	}

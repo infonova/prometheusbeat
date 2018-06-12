@@ -5,7 +5,7 @@ This file is generated! See scripts/docs_collector.py
 [[metricbeat-metricset-system-raid]]
 === System raid metricset
 
-beta[]
+experimental[]
 
 include::../../../module/system/raid/_meta/docs.asciidoc[]
 

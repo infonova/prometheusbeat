@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
@@ -13,7 +14,7 @@ import (
 )
 
 // Start starts the metrics api endpoint on the configured host and port
-func Start(cfg *common.Config) {
+func Start(cfg *common.Config, info beat.Info) {
 	cfgwarn.Experimental("Metrics endpoint is enabled.")
 	config := DefaultConfig
 	cfg.Unpack(&config)
@@ -23,9 +24,8 @@ func Start(cfg *common.Config) {
 		mux := http.NewServeMux()
 
 		// register handlers
-		mux.HandleFunc("/", rootHandler())
+		mux.HandleFunc("/", rootHandler(info))
 		mux.HandleFunc("/stats", statsHandler)
-		mux.HandleFunc("/dataset", datasetHandler)
 
 		url := config.Host + ":" + strconv.Itoa(config.Port)
 		logp.Info("Metrics endpoint listening on: %s", url)
@@ -34,7 +34,7 @@ func Start(cfg *common.Config) {
 	}()
 }
 
-func rootHandler() func(http.ResponseWriter, *http.Request) {
+func rootHandler(info beat.Info) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Return error page
 		if r.URL.Path != "/" {
@@ -44,7 +44,13 @@ func rootHandler() func(http.ResponseWriter, *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-		data := monitoring.CollectStructSnapshot(monitoring.GetNamespace("state").GetRegistry(), monitoring.Full, false)
+		data := common.MapStr{
+			"version":  info.Version,
+			"beat":     info.Beat,
+			"name":     info.Name,
+			"uuid":     info.UUID,
+			"hostname": info.Hostname,
+		}
 
 		print(w, data, r.URL)
 	}
@@ -54,15 +60,7 @@ func rootHandler() func(http.ResponseWriter, *http.Request) {
 func statsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	data := monitoring.CollectStructSnapshot(monitoring.GetNamespace("stats").GetRegistry(), monitoring.Full, false)
-
-	print(w, data, r.URL)
-}
-
-func datasetHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-	data := monitoring.CollectStructSnapshot(monitoring.GetNamespace("dataset").GetRegistry(), monitoring.Full, false)
+	data := monitoring.CollectStructSnapshot(nil, monitoring.Full, false)
 
 	print(w, data, r.URL)
 }

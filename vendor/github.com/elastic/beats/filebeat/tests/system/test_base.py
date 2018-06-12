@@ -25,13 +25,12 @@ class Test(BaseTest):
         output = self.read_output()[0]
         assert "@timestamp" in output
         assert "prospector.type" in output
-        assert "input.type" in output
 
     def test_invalid_config_with_removed_settings(self):
         """
         Checks if filebeat fails to load if removed settings have been used:
         """
-        self.render_config_template()
+        self.render_config_template(console={"pretty": "false"})
 
         exit_code = self.run_beat(extra_args=[
             "-E", "filebeat.spool_size=2048",

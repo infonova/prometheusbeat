@@ -11,4 +11,4 @@ var:
       - "c:/programdata/MySQL/MySQL Server*/error.log*"
 
 ingest_pipeline: ingest/pipeline.json
-input: config/error.yml
+prospector: config/error.yml

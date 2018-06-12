@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/beats/libbeat/common/transport/tlscommon"
+	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/libbeat/outputs/transport"
 	"github.com/elastic/beats/metricbeat/mb"
 )
@@ -25,23 +25,23 @@ type HTTP struct {
 }
 
 // NewHTTP creates new http helper
-func NewHTTP(base mb.BaseMetricSet) (*HTTP, error) {
+func NewHTTP(base mb.BaseMetricSet) *HTTP {
 	config := struct {
-		TLS     *tlscommon.Config `config:"ssl"`
-		Timeout time.Duration     `config:"timeout"`
-		Headers map[string]string `config:"headers"`
+		TLS     *outputs.TLSConfig `config:"ssl"`
+		Timeout time.Duration      `config:"timeout"`
+		Headers map[string]string  `config:"headers"`
 	}{}
 	if err := base.Module().UnpackConfig(&config); err != nil {
-		return nil, err
+		return nil
 	}
 
 	if config.Headers == nil {
 		config.Headers = map[string]string{}
 	}
 
-	tlsConfig, err := tlscommon.LoadTLSConfig(config.TLS)
+	tlsConfig, err := outputs.LoadTLSConfig(config.TLS)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	var dialer, tlsDialer transport.Dialer
@@ -49,7 +49,7 @@ func NewHTTP(base mb.BaseMetricSet) (*HTTP, error) {
 	dialer = transport.NetDialer(config.Timeout)
 	tlsDialer, err = transport.TLSDialer(dialer, tlsConfig, config.Timeout)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 
 	return &HTTP{
@@ -65,7 +65,7 @@ func NewHTTP(base mb.BaseMetricSet) (*HTTP, error) {
 		method:  "GET",
 		uri:     base.HostData().SanitizedURI,
 		body:    nil,
-	}, nil
+	}
 }
 
 // FetchResponse fetches a response for the http metricset.
@@ -95,27 +95,18 @@ func (h *HTTP) FetchResponse() (*http.Response, error) {
 	return resp, nil
 }
 
-// SetHeader sets HTTP headers to use in requests
 func (h *HTTP) SetHeader(key, value string) {
 	h.headers[key] = value
 }
 
-// SetMethod sets HTTP method to use in requests
 func (h *HTTP) SetMethod(method string) {
 	h.method = method
 }
 
-// GetURI gets the URI used in requests
-func (h *HTTP) GetURI() string {
-	return h.uri
-}
-
-// SetURI sets URI to use in requests
 func (h *HTTP) SetURI(uri string) {
 	h.uri = uri
 }
 
-// SetBody sets the body of the requests
 func (h *HTTP) SetBody(body []byte) {
 	h.body = body
 }

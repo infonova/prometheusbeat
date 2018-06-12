@@ -1,9 +1,6 @@
 package sarama
 
-import (
-	"fmt"
-	"time"
-)
+import "time"
 
 type ProduceResponseBlock struct {
 	Err    KError
@@ -30,23 +27,6 @@ func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err erro
 		} else if millis != -1 {
 			b.Timestamp = time.Unix(millis/1000, (millis%1000)*int64(time.Millisecond))
 		}
-	}
-
-	return nil
-}
-
-func (b *ProduceResponseBlock) encode(pe packetEncoder, version int16) (err error) {
-	pe.putInt16(int16(b.Err))
-	pe.putInt64(b.Offset)
-
-	if version >= 2 {
-		timestamp := int64(-1)
-		if !b.Timestamp.Before(time.Unix(0, 0)) {
-			timestamp = b.Timestamp.UnixNano() / int64(time.Millisecond)
-		} else if !b.Timestamp.IsZero() {
-			return PacketEncodingError{fmt.Sprintf("invalid timestamp (%v)", b.Timestamp)}
-		}
-		pe.putInt64(timestamp)
 	}
 
 	return nil
@@ -123,10 +103,8 @@ func (r *ProduceResponse) encode(pe packetEncoder) error {
 		}
 		for id, prb := range partitions {
 			pe.putInt32(id)
-			err = prb.encode(pe, r.Version)
-			if err != nil {
-				return err
-			}
+			pe.putInt16(int16(prb.Err))
+			pe.putInt64(prb.Offset)
 		}
 	}
 	if r.Version >= 1 {
@@ -149,8 +127,6 @@ func (r *ProduceResponse) requiredVersion() KafkaVersion {
 		return V0_9_0_0
 	case 2:
 		return V0_10_0_0
-	case 3:
-		return V0_11_0_0
 	default:
 		return minVersion
 	}

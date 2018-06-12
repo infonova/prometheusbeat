@@ -10,8 +10,6 @@ beta[]
 This module periodically fetches metrics from https://php-fpm.org[PHP-FPM]
 servers.
 
-The default metricset is `pool`.
-
 [float]
 === Module-specific configuration notes
 
@@ -51,13 +49,12 @@ in <<configuration-metricbeat>>. Here is an example configuration:
 metricbeat.modules:
 - module: php_fpm
   metricsets: ["pool"]
-  enabled: true
   period: 10s
   status_path: "/status"
   hosts: ["localhost:8080"]
 ----
 
-This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>. It also supports the options described in <<module-http-config-options>>.
+This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>.
 
 [float]
 === Metricsets

@@ -14,10 +14,9 @@ import (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("system", "cpu", New,
-		mb.WithHostParser(parse.EmptyHostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("system", "cpu", New, parse.EmptyHostParser); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet for fetching system CPU metrics.

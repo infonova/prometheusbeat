@@ -1,11 +1,5 @@
 package schema
 
-import (
-	"strings"
-
-	"github.com/elastic/beats/libbeat/logp"
-)
-
 type Errors []Error
 
 func NewErrors() *Errors {
@@ -42,29 +36,10 @@ func (errs *Errors) Error() string {
 	return error
 }
 
-// Log logs all missing required and optional fields to the debug log.
-func (errs *Errors) Log() {
-	if len(*errs) == 0 {
-		return
-	}
-	var optional, required []string
-
+func (errs *Errors) ErrorDebug() string {
+	error := "Fields are missing: "
 	for _, err := range *errs {
-		if err.IsType(RequiredType) {
-			required = append(required, err.key)
-		} else {
-			optional = append(optional, err.key)
-		}
+		error = error + "," + err.key
 	}
-
-	log := ""
-	if len(required) > 0 {
-		log = log + "required: " + strings.Join(required, ",") + "; "
-	}
-
-	if len(optional) > 0 {
-		log = log + "optional: " + strings.Join(optional, ",") + ";"
-	}
-
-	logp.Debug("schema", "Fields missing - %s", log)
+	return error
 }

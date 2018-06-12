@@ -5,8 +5,6 @@ SYSTEM_TESTS?=true
 TEST_ENVIRONMENT?=true
 GOX_FLAGS=-arch="amd64 386 arm ppc64 ppc64le"
 ES_BEATS?=..
-FIELDS_FILE_PATH=module
-
 
 include ${ES_BEATS}/libbeat/scripts/Makefile
 
@@ -20,8 +18,13 @@ kibana:
 	@rm -rf _meta/kibana
 	@mkdir -p _meta/kibana
 	@-cp -r module/*/_meta/kibana _meta/
-	@# Convert all dashboards to string
-	@python ${ES_BEATS}/libbeat/scripts/unpack_dashboards.py --glob="./_meta/kibana/6/dashboard/*.json"
+
+# Collects all module and dataset fields
+.PHONY: fields
+fields:
+	@mkdir -p _meta/
+	@cp ${ES_BEATS}/filebeat/_meta/fields.common.yml  _meta/fields.generated.yml
+	@${PYTHON_ENV}/bin/python ${ES_BEATS}/metricbeat/scripts/fields_collector.py >> _meta/fields.generated.yml
 
 # Collects all modules files to be packaged in a temporary folder
 .PHONY: modules
@@ -58,11 +61,6 @@ imports: python-env
 # Runs all collection steps and updates afterwards
 .PHONY: collect
 collect: fields kibana modules configs collect-docs imports
-
-# Creates a new module. Requires the params MODULE
-.PHONY: create-module
-create-module:
-	@go run ${ES_BEATS}/filebeat/scripts/generator/module/main.go --path=$(PWD) --beats_path=$(BEAT_GOPATH)/src/$(BEAT_PATH) --module=$(MODULE)
 
 # Creates a new fileset. Requires the params MODULE and FILESET
 .PHONY: create-fileset

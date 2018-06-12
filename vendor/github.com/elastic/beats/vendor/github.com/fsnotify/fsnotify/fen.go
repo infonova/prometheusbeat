@@ -35,9 +35,3 @@ func (w *Watcher) Add(name string) error {
 func (w *Watcher) Remove(name string) error {
 	return nil
 }
-
-// SetRecursive enables watches to also monitor subdirectories. Currently
-// only supported under Windows.
-func (w *Watcher) SetRecursive() error {
-	return nil
-}

@@ -19,10 +19,9 @@ var (
 
 // init registers the haproxy stat MetricSet.
 func init() {
-	mb.Registry.MustAddMetricSet("haproxy", statsMethod, New,
-		mb.WithHostParser(haproxy.HostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("haproxy", statsMethod, New, haproxy.HostParser); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet for haproxy stats.

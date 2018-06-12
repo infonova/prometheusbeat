@@ -12,10 +12,9 @@ import (
 )
 
 func init() {
-	mb.Registry.MustAddMetricSet("system", "uptime", New,
-		mb.WithHostParser(parse.EmptyHostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("system", "uptime", New, parse.EmptyHostParser); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet for fetching an OS uptime metric.

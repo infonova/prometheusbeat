@@ -1,5 +1,6 @@
 from filebeat import BaseTest
 import socket
+import time
 
 
 class Test(BaseTest):
@@ -8,22 +9,22 @@ class Test(BaseTest):
 
         host = "127.0.0.1"
         port = 8080
-        input_raw = """
+        prospector_raw = """
 - type: udp
   host: "{}:{}"
   enabled: true
 """
 
-        input_raw = input_raw.format(host, port)
+        prospector_raw = prospector_raw.format(host, port)
 
         self.render_config_template(
-            input_raw=input_raw,
-            inputs=False,
+            prospector_raw=prospector_raw,
+            prospectors=False,
         )
 
         filebeat = self.start_beat()
 
-        self.wait_until(lambda: self.log_contains("Started listening for UDP connection"))
+        self.wait_until(lambda: self.log_contains("Started listening for udp"))
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
 
@@ -38,4 +39,3 @@ class Test(BaseTest):
 
         assert len(output) == 2
         assert output[0]["prospector.type"] == "udp"
-        assert output[0]["input.type"] == "udp"

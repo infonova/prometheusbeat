@@ -58,7 +58,7 @@ func TestNewModuleRegistry(t *testing.T) {
 
 	for module, filesets := range reg.registry {
 		for name, fileset := range filesets {
-			cfg, err := fileset.getInputConfig()
+			cfg, err := fileset.getProspectorConfig()
 			assert.NoError(t, err, fmt.Sprintf("module: %s, fileset: %s", module, name))
 
 			moduleName, err := cfg.String("_module_name", -1)
@@ -181,28 +181,7 @@ func TestApplyOverrides(t *testing.T) {
 				},
 			},
 			expected: FilesetConfig{
-				Input: map[string]interface{}{
-					"close_eof": true,
-				},
 				Prospector: map[string]interface{}{
-					"close_eof": true,
-				},
-			},
-		},
-		{
-			name:    "input overrides",
-			fcfg:    FilesetConfig{},
-			module:  "nginx",
-			fileset: "access",
-			overrides: &ModuleOverrides{
-				"nginx": map[string]*common.Config{
-					"access": load(t, map[string]interface{}{
-						"input.close_eof": true,
-					}),
-				},
-			},
-			expected: FilesetConfig{
-				Input: map[string]interface{}{
 					"close_eof": true,
 				},
 			},
@@ -372,9 +351,9 @@ func TestMissingModuleFolder(t *testing.T) {
 	assert.NotNil(t, reg)
 
 	// this should return an empty list, but no error
-	inputs, err := reg.GetInputConfigs()
+	prospectors, err := reg.GetProspectorConfigs()
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(inputs))
+	assert.Equal(t, 0, len(prospectors))
 }
 
 func TestInterpretError(t *testing.T) {

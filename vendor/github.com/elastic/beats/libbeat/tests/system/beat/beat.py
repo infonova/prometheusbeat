@@ -9,7 +9,6 @@ import signal
 import sys
 import time
 import yaml
-import hashlib
 from datetime import datetime, timedelta
 
 from .compose import ComposeMixin
@@ -19,8 +18,6 @@ BEAT_REQUIRED_FIELDS = ["@timestamp",
                         "beat.name", "beat.hostname", "beat.version"]
 
 INTEGRATION_TESTS = os.environ.get('INTEGRATION_TESTS', False)
-
-yaml_cache = {}
 
 
 class TimeoutError(Exception):
@@ -213,7 +210,7 @@ class TestCase(unittest.TestCase, ComposeMixin):
 
         output_path = os.path.join(self.working_dir, output)
         with open(output_path, "wb") as f:
-            os.chmod(output_path, 0o600)
+            os.chmod(output_path, 0600)
             f.write(output_str.encode('utf8'))
 
     # Returns output as JSON object with flattened fields (. notation)
@@ -280,10 +277,7 @@ class TestCase(unittest.TestCase, ComposeMixin):
     def setUp(self):
 
         self.template_env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader([
-                self.beat_path,
-                os.path.abspath(os.path.join(self.beat_path, "../libbeat"))
-            ])
+            loader=jinja2.FileSystemLoader(self.beat_path)
         )
 
         # create working dir
@@ -339,30 +333,27 @@ class TestCase(unittest.TestCase, ComposeMixin):
 
     def wait_log_contains(self, msg, logfile=None,
                           max_timeout=10, poll_interval=0.1,
-                          name="log_contains",
-                          ignore_case=False):
+                          name="log_contains"):
         self.wait_until(
-            cond=lambda: self.log_contains(msg, logfile, ignore_case=ignore_case),
+            cond=lambda: self.log_contains(msg, logfile),
             max_timeout=max_timeout,
             poll_interval=poll_interval,
             name=name)
 
-    def log_contains(self, msg, logfile=None, ignore_case=False):
+    def log_contains(self, msg, logfile=None):
         """
         Returns true if the give logfile contains the given message.
         Note that the msg must be present in a single line.
         """
 
-        return self.log_contains_count(msg, logfile, ignore_case=ignore_case) > 0
+        return self.log_contains_count(msg, logfile) > 0
 
-    def log_contains_count(self, msg, logfile=None, ignore_case=False):
+    def log_contains_count(self, msg, logfile=None):
         """
         Returns the number of appearances of the given string in the log file
         """
 
         counter = 0
-        if ignore_case:
-            msg = msg.lower()
 
         # Init defaults
         if logfile is None:
@@ -371,8 +362,6 @@ class TestCase(unittest.TestCase, ComposeMixin):
         try:
             with open(os.path.join(self.working_dir, logfile), "r") as f:
                 for line in f:
-                    if ignore_case:
-                        line = line.lower()
                     if line.find(msg) >= 0:
                         counter = counter + 1
         except IOError:
@@ -495,8 +484,6 @@ class TestCase(unittest.TestCase, ComposeMixin):
         if not os.path.isfile(fields_doc):
             fields_doc = self.beat_path + "/_meta/fields.yml"
 
-        global yaml_cache
-
         # TODO: Make fields_doc path more generic to work with beat-generator
         with open(fields_doc, "r") as f:
             path = os.path.abspath(os.path.dirname(__file__) + "../../../../_meta/fields.generated.yml")
@@ -505,15 +492,9 @@ class TestCase(unittest.TestCase, ComposeMixin):
             with open(path) as f2:
                 content = f2.read()
 
+            #content = "fields:\n"
             content += f.read()
-
-            hash = hashlib.md5(content).hexdigest()
-            doc = ""
-            if hash in yaml_cache:
-                doc = yaml_cache[hash]
-            else:
-                doc = yaml.safe_load(content)
-                yaml_cache[hash] = doc
+            doc = yaml.load(content)
 
             fields = []
             dictfields = []
@@ -535,9 +516,7 @@ class TestCase(unittest.TestCase, ComposeMixin):
                 result[prefix + key] = value
         return result
 
-    def copy_files(self, files, source_dir="", target_dir=""):
-        if not source_dir:
-            source_dir = self.beat_path + "/tests/files/"
+    def copy_files(self, files, source_dir="files/", target_dir=""):
         if target_dir:
             target_dir = os.path.join(self.working_dir, target_dir)
         else:

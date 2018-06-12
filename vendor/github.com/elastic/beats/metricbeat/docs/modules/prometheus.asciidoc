@@ -10,8 +10,6 @@ beta[]
 This module periodically fetches metrics from
 https://prometheus.io/docs/[Prometheus].
 
-The default metricset is `collector`.
-
 
 [float]
 === Example configuration
@@ -24,22 +22,13 @@ in <<configuration-metricbeat>>. Here is an example configuration:
 metricbeat.modules:
 - module: prometheus
   metricsets: ["stats"]
-  enabled: true
   period: 10s
   hosts: ["localhost:9090"]
-  #metrics_path: /metrics
-  #namespace: example
-
-- module: prometheus
-  metricsets: ["collector"]
-  enabled: true
-  period: 10s
-  hosts: ["localhost:9090"]
-  #metrics_path: /metrics
+  metrics_path: /metrics
   #namespace: example
 ----
 
-This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>. It also supports the options described in <<module-http-config-options>>.
+This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>.
 
 [float]
 === Metricsets

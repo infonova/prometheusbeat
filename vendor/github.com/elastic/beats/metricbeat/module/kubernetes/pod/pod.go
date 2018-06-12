@@ -5,7 +5,6 @@ import (
 	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
-	"github.com/elastic/beats/metricbeat/module/kubernetes/util"
 )
 
 const (
@@ -23,10 +22,9 @@ var (
 // init registers the MetricSet with the central registry.
 // The New method will be called after the setup of the module and before starting to fetch data
 func init() {
-	mb.Registry.MustAddMetricSet("kubernetes", "pod", New,
-		mb.WithHostParser(hostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("kubernetes", "pod", New, hostParser); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet type defines all fields of the MetricSet
@@ -42,13 +40,9 @@ type MetricSet struct {
 // Part of new is also setting up the configuration by processing additional
 // configuration entries if needed.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	http, err := helper.NewHTTP(base)
-	if err != nil {
-		return nil, err
-	}
 	return &MetricSet{
 		BaseMetricSet: base,
-		http:          http,
+		http:          helper.NewHTTP(base),
 	}, nil
 }
 
@@ -61,7 +55,7 @@ func (m *MetricSet) Fetch() ([]common.MapStr, error) {
 		return nil, err
 	}
 
-	events, err := eventMapping(body, util.PerfMetrics)
+	events, err := eventMapping(body)
 	if err != nil {
 		return nil, err
 	}

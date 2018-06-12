@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/metricbeat/module/kubernetes/util"
 )
 
 const testFile = "../_meta/test/stats_summary.json"
@@ -22,19 +21,14 @@ func TestEventMapping(t *testing.T) {
 	body, err := ioutil.ReadAll(f)
 	assert.NoError(t, err, "cannot read test file "+testFile)
 
-	cache := util.NewPerfMetricsCache()
-	cache.NodeCoresAllocatable.Set("gke-beats-default-pool-a5b33e2e-hdww", 2)
-	cache.NodeMemAllocatable.Set("gke-beats-default-pool-a5b33e2e-hdww", 146227200)
-	cache.ContainerMemLimit.Set(util.ContainerUID("default", "nginx-deployment-2303442956-pcqfc", "nginx"), 14622720)
-
-	events, err := eventMapping(body, cache)
+	events, err := eventMapping(body)
 	assert.NoError(t, err, "error mapping "+testFile)
 
 	assert.Len(t, events, 1, "got wrong number of events")
 
 	testCases := map[string]interface{}{
 		"cpu.usage.core.ns":   43959424,
-		"cpu.usage.nanocores": 11263994,
+		"cpu.usage.nanocores": 0,
 
 		"logs.available.bytes": 98727014400,
 		"logs.capacity.bytes":  101258067968,
@@ -49,12 +43,6 @@ func TestEventMapping(t *testing.T) {
 		"memory.workingset.bytes": 1454080,
 		"memory.pagefaults":       841,
 		"memory.majorpagefaults":  0,
-
-		// calculated pct fields:
-		"cpu.usage.node.pct":     0.005631997,
-		"cpu.usage.limit.pct":    0.005631997,
-		"memory.usage.node.pct":  0.01,
-		"memory.usage.limit.pct": 0.1,
 
 		"name": "nginx",
 

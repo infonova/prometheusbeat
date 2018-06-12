@@ -33,9 +33,6 @@
             },
             "prospector": {
                 "type": "log"
-            },
-            "input": {
-                "type": "log"
             }
         },
         "fields": {
@@ -92,9 +89,6 @@
             },
             "prospector": {
                 "type": "log"
-            },
-            "input": {
-                "type": "log"
             }
         },
         "fields": {
@@ -133,9 +127,6 @@
                 "source_type": "apache2-access"
             },
             "prospector": {
-                "type": "log"
-            },
-            "input": {
                 "type": "log"
             }
         },
@@ -184,9 +175,6 @@
             },
             "offset": 443,
             "prospector": {
-                "type": "log"
-            },
-            "input": {
                 "type": "log"
             },
             "read_timestamp": "2017-05-29T19:34:14.378Z",

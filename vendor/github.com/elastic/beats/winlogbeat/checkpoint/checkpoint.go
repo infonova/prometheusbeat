@@ -45,7 +45,6 @@ type EventLogState struct {
 	Name         string    `yaml:"name"`
 	RecordNumber uint64    `yaml:"record_number"`
 	Timestamp    time.Time `yaml:"timestamp"`
-	Bookmark     string    `yaml:"bookmark,omitempty"`
 }
 
 // NewCheckpoint creates and returns a new Checkpoint. This method loads state
@@ -157,12 +156,11 @@ func (c *Checkpoint) States() map[string]EventLogState {
 }
 
 // Persist queues the given event log state information to be written to disk.
-func (c *Checkpoint) Persist(name string, recordNumber uint64, ts time.Time, bookmark string) {
+func (c *Checkpoint) Persist(name string, recordNumber uint64, ts time.Time) {
 	c.PersistState(EventLogState{
 		Name:         name,
 		RecordNumber: recordNumber,
 		Timestamp:    ts,
-		Bookmark:     bookmark,
 	})
 }
 

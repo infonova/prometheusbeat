@@ -7,7 +7,7 @@ This file is generated! See scripts/docs_collector.py
 
 beta[]
 
-This is the http://dropwizard.io[Dropwizard] module. The default metricset is `collector`.
+This is the http://dropwizard.io[Dropwizard] module.
 
 
 
@@ -26,10 +26,9 @@ metricbeat.modules:
   hosts: ["localhost:8080"]
   metrics_path: /metrics/metrics
   namespace: example
-  enabled: true
 ----
 
-This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>. It also supports the options described in <<module-http-config-options>>.
+This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>.
 
 [float]
 === Metricsets

@@ -1,5 +1,4 @@
-//+build linux,go1.8 darwin,go1.10
-//+build cgo
+//+build linux,go1.8,cgo
 
 package plugin
 

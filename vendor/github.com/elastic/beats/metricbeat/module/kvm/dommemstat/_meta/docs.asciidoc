@@ -1,3 +1,0 @@
-=== kvm dommemstat MetricSet
-
-This is the dommemstat metricset of the module kvm.

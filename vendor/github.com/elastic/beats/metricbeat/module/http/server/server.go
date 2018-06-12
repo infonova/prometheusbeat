@@ -1,7 +1,6 @@
 package server
 
 import (
-	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	serverhelper "github.com/elastic/beats/metricbeat/helper/server"
 	"github.com/elastic/beats/metricbeat/helper/server/http"
@@ -30,7 +29,7 @@ type MetricSet struct {
 // Part of new is also setting up the configuration by processing additional
 // configuration entries if needed.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	cfgwarn.Beta("The http server metricset is beta")
+	cfgwarn.Experimental("EXPERIMENTAL: The http server metricset is experimental")
 
 	config := defaultHttpServerConfig()
 	if err := base.Module().UnpackConfig(&config); err != nil {
@@ -51,7 +50,7 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 }
 
 // Run method provides the Graphite server with a reporter with which events can be reported.
-func (m *MetricSet) Run(reporter mb.PushReporterV2) {
+func (m *MetricSet) Run(reporter mb.PushReporter) {
 	// Start event watcher
 	m.server.Start()
 
@@ -61,15 +60,10 @@ func (m *MetricSet) Run(reporter mb.PushReporterV2) {
 			m.server.Stop()
 			return
 		case msg := <-m.server.GetEvents():
-			fields, err := m.processor.Process(msg)
+			event, err := m.processor.Process(msg)
 			if err != nil {
 				reporter.Error(err)
 			} else {
-				event := mb.Event{}
-				event.ModuleFields = common.MapStr{}
-				metricSetName := fields[mb.NamespaceKey].(string)
-				delete(fields, mb.NamespaceKey)
-				event.ModuleFields.Put(metricSetName, fields)
 				reporter.Event(event)
 			}
 

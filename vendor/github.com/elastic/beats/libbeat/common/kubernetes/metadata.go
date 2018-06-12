@@ -1,11 +1,6 @@
 package kubernetes
 
-import (
-	"strings"
-
-	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/safemapstr"
-)
+import "github.com/elastic/beats/libbeat/common"
 
 // MetaGenerator builds metadata objects for pods and containers
 type MetaGenerator interface {
@@ -17,41 +12,37 @@ type MetaGenerator interface {
 }
 
 type metaGenerator struct {
-	IncludeLabels          []string `config:"include_labels"`
-	ExcludeLabels          []string `config:"exclude_labels"`
-	IncludeAnnotations     []string `config:"include_annotations"`
-	IncludePodUID          bool     `config:"include_pod_uid"`
-	IncludeCreatorMetadata bool     `config:"include_creator_metadata"`
+	annotations   []string
+	labels        []string
+	labelsExclude []string
 }
 
 // NewMetaGenerator initializes and returns a new kubernetes metadata generator
-func NewMetaGenerator(cfg *common.Config) (MetaGenerator, error) {
-	// default settings:
-	generator := metaGenerator{
-		IncludeCreatorMetadata: true,
+func NewMetaGenerator(annotations, labels, labelsExclude []string) MetaGenerator {
+	return &metaGenerator{
+		annotations:   annotations,
+		labels:        labels,
+		labelsExclude: labelsExclude,
 	}
-
-	err := cfg.Unpack(&generator)
-	return &generator, err
 }
 
 // PodMetadata generates metadata for the given pod taking to account certain filters
 func (g *metaGenerator) PodMetadata(pod *Pod) common.MapStr {
 	labelMap := common.MapStr{}
-	if len(g.IncludeLabels) == 0 {
+	if len(g.labels) == 0 {
 		for k, v := range pod.Metadata.Labels {
-			safemapstr.Put(labelMap, k, v)
+			labelMap[k] = v
 		}
 	} else {
-		labelMap = generateMapSubset(pod.Metadata.Labels, g.IncludeLabels)
+		labelMap = generateMapSubset(pod.Metadata.Labels, g.labels)
 	}
 
 	// Exclude any labels that are present in the exclude_labels config
-	for _, label := range g.ExcludeLabels {
+	for _, label := range g.labelsExclude {
 		delete(labelMap, label)
 	}
 
-	annotationsMap := generateMapSubset(pod.Metadata.Annotations, g.IncludeAnnotations)
+	annotationsMap := generateMapSubset(pod.Metadata.Annotations, g.annotations)
 	meta := common.MapStr{
 		"pod": common.MapStr{
 			"name": pod.Metadata.Name,
@@ -60,26 +51,6 @@ func (g *metaGenerator) PodMetadata(pod *Pod) common.MapStr {
 			"name": pod.Spec.NodeName,
 		},
 		"namespace": pod.Metadata.Namespace,
-	}
-
-	// Add Pod UID metadata if enabled
-	if g.IncludePodUID {
-		safemapstr.Put(meta, "pod.uid", pod.Metadata.UID)
-	}
-
-	// Add controller metadata if present
-	if g.IncludeCreatorMetadata {
-		for _, ref := range pod.Metadata.OwnerReferences {
-			if ref.Controller {
-				switch ref.Kind {
-				// TODO grow this list as we keep adding more `state_*` metricsets
-				case "Deployment",
-					"ReplicaSet",
-					"StatefulSet":
-					safemapstr.Put(meta, strings.ToLower(ref.Kind)+".name", ref.Name)
-				}
-			}
-		}
 	}
 
 	if len(labelMap) != 0 {
@@ -114,7 +85,7 @@ func generateMapSubset(input map[string]string, keys []string) common.MapStr {
 	for _, key := range keys {
 		value, ok := input[key]
 		if ok {
-			safemapstr.Put(output, key, value)
+			output[key] = value
 		}
 	}
 

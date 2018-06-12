@@ -6,9 +6,7 @@ import (
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/common/fmtstr"
-	"github.com/elastic/go-ucfg/yaml"
 )
 
 var (
@@ -19,8 +17,6 @@ var (
 
 	// Array to store dynamicTemplate parts in
 	dynamicTemplates []common.MapStr
-
-	defaultFields []string
 )
 
 type Template struct {
@@ -28,7 +24,7 @@ type Template struct {
 	pattern     string
 	beatVersion common.Version
 	esVersion   common.Version
-	config      TemplateConfig
+	settings    TemplateSettings
 }
 
 // New creates a new template instance
@@ -91,51 +87,26 @@ func New(beatVersion string, beatName string, esVersion string, config TemplateC
 		name:        name,
 		beatVersion: *bV,
 		esVersion:   *esV,
-		config:      config,
+		settings:    config.Settings,
 	}, nil
 }
 
-func (t *Template) load(fields common.Fields) (common.MapStr, error) {
-
-	var err error
-	if len(t.config.AppendFields) > 0 {
-		cfgwarn.Experimental("append_fields is used.")
-		fields, err = appendFields(fields, t.config.AppendFields)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Start processing at the root
-	properties := common.MapStr{}
-	processor := Processor{EsVersion: t.esVersion}
-	if err := processor.Process(fields, "", properties); err != nil {
-		return nil, err
-	}
-	output := t.Generate(properties, dynamicTemplates)
-
-	return output, nil
-}
-
-// LoadFile loads the the template from the given file path
-func (t *Template) LoadFile(file string) (common.MapStr, error) {
-
+// Load the given input and generates the input based on it
+func (t *Template) Load(file string) (common.MapStr, error) {
 	fields, err := common.LoadFieldsYaml(file)
 	if err != nil {
 		return nil, err
 	}
 
-	return t.load(fields)
-}
-
-// LoadBytes loads the the template from the given byte array
-func (t *Template) LoadBytes(data []byte) (common.MapStr, error) {
-	fields, err := loadYamlByte(data)
-	if err != nil {
+	// Start processing at the root
+	properties := common.MapStr{}
+	processor := Processor{EsVersion: t.esVersion}
+	if err := processor.process(fields, "", properties); err != nil {
 		return nil, err
 	}
+	output := t.generate(properties, dynamicTemplates)
 
-	return t.load(fields)
+	return output, nil
 }
 
 // GetName returns the name of the template
@@ -148,9 +119,9 @@ func (t *Template) GetPattern() string {
 	return t.pattern
 }
 
-// Generate generates the full template
+// generate generates the full template
 // The default values are taken from the default variable.
-func (t *Template) Generate(properties common.MapStr, dynamicTemplates []common.MapStr) common.MapStr {
+func (t *Template) generate(properties common.MapStr, dynamicTemplates []common.MapStr) common.MapStr {
 	// Add base dynamic template
 	var dynamicTemplateBase = common.MapStr{
 		"strings_as_keyword": common.MapStr{
@@ -184,12 +155,7 @@ func (t *Template) Generate(properties common.MapStr, dynamicTemplates []common.
 		indexSettings.Put("number_of_routing_shards", defaultNumberOfRoutingShards)
 	}
 
-	if t.esVersion.IsMajor(7) {
-		defaultFields = append(defaultFields, "fields.*")
-		indexSettings.Put("query.default_field", defaultFields)
-	}
-
-	indexSettings.DeepUpdate(t.config.Settings.Index)
+	indexSettings.DeepUpdate(t.settings.Index)
 
 	var mappingName string
 	if t.esVersion.Major >= 6 {
@@ -216,9 +182,9 @@ func (t *Template) Generate(properties common.MapStr, dynamicTemplates []common.
 		},
 	}
 
-	if len(t.config.Settings.Source) > 0 {
+	if len(t.settings.Source) > 0 {
 		key := fmt.Sprintf("mappings.%s._source", mappingName)
-		basicStructure.Put(key, t.config.Settings.Source)
+		basicStructure.Put(key, t.settings.Source)
 	}
 
 	// ES 6 moved from template to index_patterns: https://github.com/elastic/elasticsearch/pull/21009
@@ -233,38 +199,4 @@ func (t *Template) Generate(properties common.MapStr, dynamicTemplates []common.
 	}
 
 	return basicStructure
-}
-
-func appendFields(fields, appendFields common.Fields) (common.Fields, error) {
-	if len(appendFields) > 0 {
-		appendFieldKeys := appendFields.GetKeys()
-
-		// Append is only allowed to add fields, not overwrite
-		for _, key := range appendFieldKeys {
-			if fields.HasNode(key) {
-				return nil, fmt.Errorf("append_fields contains an already existing key: %s", key)
-			}
-		}
-		// Appends fields to existing fields
-		fields = append(fields, appendFields...)
-	}
-	return fields, nil
-}
-
-func loadYamlByte(data []byte) (common.Fields, error) {
-
-	var keys []common.Field
-
-	cfg, err := yaml.NewConfig(data)
-	if err != nil {
-		return nil, err
-	}
-	cfg.Unpack(&keys)
-
-	fields := common.Fields{}
-
-	for _, key := range keys {
-		fields = append(fields, key.Fields...)
-	}
-	return fields, nil
 }

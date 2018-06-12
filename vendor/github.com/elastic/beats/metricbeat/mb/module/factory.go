@@ -13,25 +13,26 @@ import (
 // Factory creates new Runner instances from configuration objects.
 // It is used to register and reload modules.
 type Factory struct {
-	options []Option
+	pipeline beat.Pipeline
+	options  []Option
 }
 
 // NewFactory creates new Reloader instance for the given config
-func NewFactory(options ...Option) *Factory {
+func NewFactory(p beat.Pipeline, options ...Option) *Factory {
 	return &Factory{
-		options: options,
+		pipeline: p,
+		options:  options,
 	}
 }
 
-// Create creates a new metricbeat module runner reporting events to the passed pipeline.
-func (r *Factory) Create(p beat.Pipeline, c *common.Config, meta *common.MapStrPointer) (cfgfile.Runner, error) {
+func (r *Factory) Create(c *common.Config, meta *common.MapStrPointer) (cfgfile.Runner, error) {
 	var errs multierror.Errors
 
 	err := cfgwarn.CheckRemoved5xSettings(c, "filters")
 	if err != nil {
 		errs = append(errs, err)
 	}
-	connector, err := NewConnector(p, c, meta)
+	connector, err := NewConnector(r.pipeline, c, meta)
 	if err != nil {
 		errs = append(errs, err)
 	}

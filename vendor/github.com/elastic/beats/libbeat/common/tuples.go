@@ -15,15 +15,10 @@ const MaxIPPortTupleRawSize = 16 + 16 + 2 + 2
 
 type HashableIPPortTuple [MaxIPPortTupleRawSize]byte
 
-type BaseTuple struct {
+type IPPortTuple struct {
+	IPLength         int
 	SrcIP, DstIP     net.IP
 	SrcPort, DstPort uint16
-}
-
-type IPPortTuple struct {
-	BaseTuple
-
-	IPLength int
 
 	raw    HashableIPPortTuple // Src_ip:Src_port:Dst_ip:Dst_port
 	revRaw HashableIPPortTuple // Dst_ip:Dst_port:Src_ip:Src_port
@@ -34,12 +29,10 @@ func NewIPPortTuple(ipLength int, srcIP net.IP, srcPort uint16,
 
 	tuple := IPPortTuple{
 		IPLength: ipLength,
-		BaseTuple: BaseTuple{
-			SrcIP:   srcIP,
-			DstIP:   dstIP,
-			SrcPort: srcPort,
-			DstPort: dstPort,
-		},
+		SrcIP:    srcIP,
+		DstIP:    dstIP,
+		SrcPort:  srcPort,
+		DstPort:  dstPort,
 	}
 	tuple.ComputeHashebles()
 
@@ -83,10 +76,10 @@ const MaxTCPTupleRawSize = 16 + 16 + 2 + 2 + 4
 type HashableTCPTuple [MaxTCPTupleRawSize]byte
 
 type TCPTuple struct {
-	BaseTuple
-	IPLength int
-
-	StreamID uint32
+	IPLength         int
+	SrcIP, DstIP     net.IP
+	SrcPort, DstPort uint16
+	StreamID         uint32
 
 	raw HashableTCPTuple // Src_ip:Src_port:Dst_ip:Dst_port:stream_id
 }
@@ -94,12 +87,10 @@ type TCPTuple struct {
 func TCPTupleFromIPPort(t *IPPortTuple, streamID uint32) TCPTuple {
 	tuple := TCPTuple{
 		IPLength: t.IPLength,
-		BaseTuple: BaseTuple{
-			SrcIP:   t.SrcIP,
-			DstIP:   t.DstIP,
-			SrcPort: t.SrcPort,
-			DstPort: t.DstPort,
-		},
+		SrcIP:    t.SrcIP,
+		DstIP:    t.DstIP,
+		SrcPort:  t.SrcPort,
+		DstPort:  t.DstPort,
 		StreamID: streamID,
 	}
 	tuple.ComputeHashebles()
@@ -138,22 +129,7 @@ func (t *TCPTuple) Hashable() HashableTCPTuple {
 	return t.raw
 }
 
-// CmdlineTuple contains the source and destination process names, as found by
-// the proc module.
+// Source and destination process names, as found by the proc module.
 type CmdlineTuple struct {
-	// Source and destination processes names as specified in packetbeat.procs.monitored
 	Src, Dst []byte
-	// Source and destination full command lines
-	SrcCommand, DstCommand []byte
-}
-
-// Reverse returns a copy of the receiver with the source and destination fields
-// swapped.
-func (c *CmdlineTuple) Reverse() CmdlineTuple {
-	return CmdlineTuple{
-		Src:        c.Dst,
-		Dst:        c.Src,
-		SrcCommand: c.DstCommand,
-		DstCommand: c.SrcCommand,
-	}
 }

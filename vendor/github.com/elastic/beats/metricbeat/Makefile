@@ -1,17 +1,19 @@
+#!/bin/bash
+
 # Name can be overwritten, as Metricbeat is also a library
 BEAT_NAME?=metricbeat
 BEAT_TITLE?=Metricbeat
 BEAT_DESCRIPTION?=Metricbeat is a lightweight shipper for metrics.
 SYSTEM_TESTS?=true
 TEST_ENVIRONMENT?=true
+TESTING_ENVIRONMENT?=snapshot-noxpack
+GOPACKAGES=$(shell go list ${BEAT_PATH}/... | grep -v /vendor/)
 ES_BEATS?=..
-FIELDS_FILE_PATH?=module
 
 # Metricbeat can only be cross-compiled on platforms not requiring CGO.
-GOX_OS=netbsd linux windows
+GOX_OS=solaris netbsd linux windows
 GOX_FLAGS=-arch="amd64 386 arm ppc64 ppc64le"
 
-DOCS_BRANCH=$(shell grep doc-branch ../libbeat/docs/version.asciidoc | cut -c 14-)
 
 include ${ES_BEATS}/libbeat/scripts/Makefile
 
@@ -21,9 +23,13 @@ kibana:
 	@rm -rf _meta/kibana
 	@mkdir -p _meta/kibana
 	@-cp -r module/*/_meta/kibana _meta/
-	@-cp -r module/*/_meta/kibana _meta/
-	@# Convert all dashboards to string
-	@python ${ES_BEATS}/libbeat/scripts/unpack_dashboards.py --glob="./_meta/kibana/6/dashboard/*.json"
+
+# Collects all module and metricset fields
+.PHONY: fields
+fields: python-env
+	@mkdir -p _meta
+	@cp ${ES_BEATS}/metricbeat/_meta/fields.common.yml _meta/fields.generated.yml
+	@${PYTHON_ENV}/bin/python ${ES_BEATS}/metricbeat/scripts/fields_collector.py >> _meta/fields.generated.yml
 
 # Collects all module docs
 .PHONY: collect-docs
@@ -39,8 +45,8 @@ configs: python-env
 	@cat ${ES_BEATS}/metricbeat/_meta/setup.yml >> _meta/beat.yml
 	@cat ${ES_BEATS}/metricbeat/_meta/common.reference.yml > _meta/beat.reference.yml
 	@${PYTHON_ENV}/bin/python ${ES_BEATS}/script/config_collector.py --beat ${BEAT_NAME} --full $(PWD) >> _meta/beat.reference.yml
-	@rm -rf modules.d
-	${PYTHON_ENV}/bin/python ${ES_BEATS}/metricbeat/scripts/modules_collector.py --docs_branch=$(DOCS_BRANCH)
+	@rm -rf modules.d && mkdir -p modules.d
+	@for MODULE in `find module -maxdepth 1 -mindepth 1 -type d -exec basename {} \;`; do cp -a $(PWD)/module/$$MODULE/_meta/config.yml modules.d/$$MODULE.yml.disabled; done
 	@chmod go-w modules.d/*
 	@# Enable system by default:
 	@if [ -f modules.d/system.yml.disabled ]; then mv modules.d/system.yml.disabled modules.d/system.yml; fi

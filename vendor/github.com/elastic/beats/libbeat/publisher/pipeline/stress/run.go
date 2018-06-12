@@ -1,7 +1,6 @@
 package stress
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -37,13 +36,13 @@ func RunTests(
 ) error {
 	config := defaultConfig
 	if err := cfg.Unpack(&config); err != nil {
-		return fmt.Errorf("unpacking config failed: %v", err)
+		return err
 	}
 
 	// reg := monitoring.NewRegistry()
 	pipeline, err := pipeline.Load(info, nil, config.Pipeline, config.Output)
 	if err != nil {
-		return fmt.Errorf("loading pipeline failed: %v", err)
+		return err
 	}
 	defer func() {
 		logp.Info("Stop pipeline")

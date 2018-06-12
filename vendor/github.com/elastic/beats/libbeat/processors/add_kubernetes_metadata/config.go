@@ -14,11 +14,14 @@ type kubeAnnotatorConfig struct {
 	SyncPeriod time.Duration `config:"sync_period"`
 	// Annotations are kept after pod is removed, until they haven't been accessed
 	// for a full `cleanup_timeout`:
-	CleanupTimeout  time.Duration `config:"cleanup_timeout"`
-	Indexers        PluginConfig  `config:"indexers"`
-	Matchers        PluginConfig  `config:"matchers"`
-	DefaultMatchers Enabled       `config:"default_matchers"`
-	DefaultIndexers Enabled       `config:"default_indexers"`
+	CleanupTimeout     time.Duration `config:"cleanup_timeout"`
+	Indexers           PluginConfig  `config:"indexers"`
+	Matchers           PluginConfig  `config:"matchers"`
+	DefaultMatchers    Enabled       `config:"default_matchers"`
+	DefaultIndexers    Enabled       `config:"default_indexers"`
+	IncludeLabels      []string      `config:"include_labels"`
+	ExcludeLabels      []string      `config:"exclude_labels"`
+	IncludeAnnotations []string      `config:"include_annotations"`
 }
 
 type Enabled struct {

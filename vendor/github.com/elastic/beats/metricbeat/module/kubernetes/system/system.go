@@ -22,10 +22,9 @@ var (
 // init registers the MetricSet with the central registry.
 // The New method will be called after the setup of the module and before starting to fetch data
 func init() {
-	mb.Registry.MustAddMetricSet("kubernetes", "system", New,
-		mb.WithHostParser(hostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("kubernetes", "system", New, hostParser); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet type defines all fields of the MetricSet
@@ -41,13 +40,9 @@ type MetricSet struct {
 // Part of new is also setting up the configuration by processing additional
 // configuration entries if needed.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	http, err := helper.NewHTTP(base)
-	if err != nil {
-		return nil, err
-	}
 	return &MetricSet{
 		BaseMetricSet: base,
-		http:          http,
+		http:          helper.NewHTTP(base),
 	}, nil
 }
 

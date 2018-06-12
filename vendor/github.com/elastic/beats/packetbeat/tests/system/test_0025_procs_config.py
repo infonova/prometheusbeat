@@ -8,8 +8,7 @@ Tests for checking the procs monitoring configuration.
 class Test(BaseTest):
 
     MsgNotOnLinux = "Disabled /proc/ reading because not on linux"
-    MsgEnabled = "Process watcher enabled"
-    MsgDisabled = "Process watcher disabled when file input is used"
+    MsgEnabled = "Process matching enabled"
 
     def test_procs_default(self):
         """
@@ -22,11 +21,13 @@ class Test(BaseTest):
 
         assert len(objs) == 1
 
-        assert self.log_contains(self.MsgDisabled)
+        assert not self.log_contains(self.MsgNotOnLinux) and \
+            not self.log_contains(self.MsgEnabled)
 
     def test_procs_is_enabled(self):
         """
-        Should stay disabled when configured but using file input
+        Should be enabled when configured (but can be still
+        disabled if we're not on Linux.
         """
         self.render_config_template(procs_enabled=True)
         self.run_packetbeat(pcap="http_post.pcap",
@@ -35,4 +36,5 @@ class Test(BaseTest):
 
         assert len(objs) == 1
 
-        assert self.log_contains(self.MsgDisabled)
+        assert self.log_contains(self.MsgNotOnLinux) or \
+            self.log_contains(self.MsgEnabled)

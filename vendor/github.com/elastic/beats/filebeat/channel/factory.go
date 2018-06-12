@@ -7,7 +7,8 @@ import (
 )
 
 type OutletFactory struct {
-	done <-chan struct{}
+	done     <-chan struct{}
+	pipeline beat.Pipeline
 
 	eventer  beat.ClientEventer
 	wgEvents eventCounter
@@ -23,15 +24,15 @@ type clientEventer struct {
 	wgEvents eventCounter
 }
 
-// inputOutletConfig defines common input settings
+// prospectorOutletConfig defines common prospector settings
 // for the publisher pipline.
-type inputOutletConfig struct {
+type prospectorOutletConfig struct {
 	// event processing
 	common.EventMetadata `config:",inline"`      // Fields and tags to add to events.
 	Processors           processors.PluginConfig `config:"processors"`
 
 	// implicit event fields
-	Type string `config:"type"` // input.type
+	Type string `config:"type"` // prospector.type
 
 	// hidden filebeat modules settings
 	Module  string `config:"_module_name"`  // hidden setting
@@ -43,13 +44,15 @@ type inputOutletConfig struct {
 }
 
 // NewOutletFactory creates a new outlet factory for
-// connecting an input to the publisher pipeline.
+// connecting a prospector to the publisher pipeline.
 func NewOutletFactory(
 	done <-chan struct{},
+	pipeline beat.Pipeline,
 	wgEvents eventCounter,
 ) *OutletFactory {
 	o := &OutletFactory{
 		done:     done,
+		pipeline: pipeline,
 		wgEvents: wgEvents,
 	}
 
@@ -60,12 +63,12 @@ func NewOutletFactory(
 	return o
 }
 
-// Create builds a new Outleter, while applying common input settings.
-// Inputs and all harvesters use the same pipeline client instance.
+// Create builds a new Outleter, while applying common prospector settings.
+// Prospectors and all harvesters use the same pipeline client instance.
 // This guarantees ordering between events as required by the registrar for
 // file.State updates
-func (f *OutletFactory) Create(p beat.Pipeline, cfg *common.Config, dynFields *common.MapStrPointer) (Outleter, error) {
-	config := inputOutletConfig{}
+func (f *OutletFactory) Create(cfg *common.Config, dynFields *common.MapStrPointer) (Outleter, error) {
+	config := prospectorOutletConfig{}
 	if err := cfg.Unpack(&config); err != nil {
 		return nil, err
 	}
@@ -96,12 +99,9 @@ func (f *OutletFactory) Create(p beat.Pipeline, cfg *common.Config, dynFields *c
 		fields["prospector"] = common.MapStr{
 			"type": config.Type,
 		}
-		fields["input"] = common.MapStr{
-			"type": config.Type,
-		}
 	}
 
-	client, err := p.ConnectWith(beat.ClientConfig{
+	client, err := f.pipeline.ConnectWith(beat.ClientConfig{
 		PublishMode:   beat.GuaranteedSend,
 		EventMetadata: config.EventMetadata,
 		DynamicFields: dynFields,

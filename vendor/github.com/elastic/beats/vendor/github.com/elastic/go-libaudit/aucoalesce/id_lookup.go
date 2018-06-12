@@ -1,19 +1,16 @@
-// Licensed to Elasticsearch B.V. under one or more contributor
-// license agreements. See the NOTICE file distributed with
-// this work for additional information regarding copyright
-// ownership. Elasticsearch B.V. licenses this file to you under
-// the Apache License, Version 2.0 (the "License"); you may
-// not use this file except in compliance with the License.
+// Copyright 2017-2018 Elasticsearch Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package aucoalesce
 
@@ -24,11 +21,11 @@ import (
 	"time"
 )
 
-const cacheTimeout = time.Minute
+const cacheTimeout = 0
 
 var (
-	userLookup  = NewUserCache(cacheTimeout)
-	groupLookup = NewGroupCache(cacheTimeout)
+	userLookup  = NewUserCache()
+	groupLookup = NewGroupCache()
 )
 
 type stringItem struct {
@@ -41,18 +38,12 @@ func (i *stringItem) isExpired() bool {
 }
 
 // UserCache is a cache of UID to username.
-type UserCache struct {
-	expiration time.Duration
-	data       map[string]stringItem
-}
+type UserCache map[string]stringItem
 
-// NewUserCache returns a new UserCache. UserCache is not thread-safe.
-func NewUserCache(expiration time.Duration) UserCache {
-	return UserCache{
-		expiration: expiration,
-		data: map[string]stringItem{
-			"0": {timeout: time.Unix(math.MaxInt64, 0), value: "root"},
-		},
+// NewUserCache returns a new UserCache.
+func NewUserCache() UserCache {
+	return map[string]stringItem{
+		"0": {timeout: time.Unix(math.MaxInt64, 0), value: "root"},
 	}
 }
 
@@ -64,34 +55,28 @@ func (c UserCache) LookupUID(uid string) string {
 		return ""
 	}
 
-	if item, found := c.data[uid]; found && !item.isExpired() {
+	if item, found := c[uid]; found && !item.isExpired() {
 		return item.value
 	}
 
 	// Cache the value (even on error).
 	user, err := user.LookupId(uid)
 	if err != nil {
-		c.data[uid] = stringItem{timeout: time.Now().Add(c.expiration), value: ""}
+		c[uid] = stringItem{timeout: time.Now().Add(cacheTimeout), value: ""}
 		return ""
 	}
 
-	c.data[uid] = stringItem{timeout: time.Now().Add(c.expiration), value: user.Username}
+	c[uid] = stringItem{timeout: time.Now().Add(cacheTimeout), value: user.Username}
 	return user.Username
 }
 
 // GroupCache is a cache of GID to group name.
-type GroupCache struct {
-	expiration time.Duration
-	data       map[string]stringItem
-}
+type GroupCache map[string]stringItem
 
-// NewGroupCache returns a new GroupCache. GroupCache is not thread-safe.
-func NewGroupCache(expiration time.Duration) GroupCache {
-	return GroupCache{
-		expiration: expiration,
-		data: map[string]stringItem{
-			"0": {timeout: time.Unix(math.MaxInt64, 0), value: "root"},
-		},
+// NewGroupCache returns a new GroupCache.
+func NewGroupCache() GroupCache {
+	return map[string]stringItem{
+		"0": {timeout: time.Unix(math.MaxInt64, 0), value: "root"},
 	}
 }
 
@@ -103,36 +88,29 @@ func (c GroupCache) LookupGID(gid string) string {
 		return ""
 	}
 
-	if item, found := c.data[gid]; found && !item.isExpired() {
+	if item, found := c[gid]; found && !item.isExpired() {
 		return item.value
 	}
 
 	// Cache the value (even on error).
 	group, err := user.LookupGroupId(gid)
 	if err != nil {
-		c.data[gid] = stringItem{timeout: time.Now().Add(c.expiration), value: ""}
+		c[gid] = stringItem{timeout: time.Now().Add(cacheTimeout), value: ""}
 		return ""
 	}
 
-	c.data[gid] = stringItem{timeout: time.Now().Add(c.expiration), value: group.Name}
+	c[gid] = stringItem{timeout: time.Now().Add(cacheTimeout), value: group.Name}
 	return group.Name
 }
 
 // ResolveIDs translates all uid and gid values to their associated names.
-// Prior to Go 1.9 this requires cgo on Linux. UID and GID values are cached
-// for 60 seconds from the time they are read.
+// This requires cgo on Linux.
 func ResolveIDs(event *Event) {
-	ResolveIDsFromCaches(event, userLookup, groupLookup)
-}
-
-// ResolveIDsFromCaches translates all uid and gid values to their associated
-// names using the provided caches. Prior to Go 1.9 this requires cgo on Linux.
-func ResolveIDsFromCaches(event *Event, users UserCache, groups GroupCache) {
 	// Actor
-	if v := users.LookupUID(event.Summary.Actor.Primary); v != "" {
+	if v := userLookup.LookupUID(event.Summary.Actor.Primary); v != "" {
 		event.Summary.Actor.Primary = v
 	}
-	if v := users.LookupUID(event.Summary.Actor.Secondary); v != "" {
+	if v := userLookup.LookupUID(event.Summary.Actor.Secondary); v != "" {
 		event.Summary.Actor.Secondary = v
 	}
 
@@ -140,11 +118,11 @@ func ResolveIDsFromCaches(event *Event, users UserCache, groups GroupCache) {
 	names := map[string]string{}
 	for key, id := range event.User.IDs {
 		if strings.HasSuffix(key, "uid") {
-			if v := users.LookupUID(id); v != "" {
+			if v := userLookup.LookupUID(id); v != "" {
 				names[key] = v
 			}
 		} else if strings.HasSuffix(key, "gid") {
-			if v := groups.LookupGID(id); v != "" {
+			if v := groupLookup.LookupGID(id); v != "" {
 				names[key] = v
 			}
 		}
@@ -156,10 +134,10 @@ func ResolveIDsFromCaches(event *Event, users UserCache, groups GroupCache) {
 	// File owner/group
 	if event.File != nil {
 		if event.File.UID != "" {
-			event.File.Owner = users.LookupUID(event.File.UID)
+			event.File.Owner = userLookup.LookupUID(event.File.UID)
 		}
 		if event.File.GID != "" {
-			event.File.Group = groups.LookupGID(event.File.GID)
+			event.File.Group = groupLookup.LookupGID(event.File.GID)
 		}
 	}
 }

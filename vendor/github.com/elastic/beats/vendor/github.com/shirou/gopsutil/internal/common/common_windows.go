@@ -3,11 +3,8 @@
 package common
 
 import (
-	"context"
+	"syscall"
 	"unsafe"
-
-	"github.com/StackExchange/wmi"
-	"golang.org/x/sys/windows"
 )
 
 // for double values
@@ -47,10 +44,9 @@ const (
 )
 
 var (
-	Modkernel32 = windows.NewLazyDLL("kernel32.dll")
-	ModNt       = windows.NewLazyDLL("ntdll.dll")
-	ModPdh      = windows.NewLazyDLL("pdh.dll")
-	ModPsapi    = windows.NewLazyDLL("psapi.dll")
+	Modkernel32 = syscall.NewLazyDLL("kernel32.dll")
+	ModNt       = syscall.NewLazyDLL("ntdll.dll")
+	ModPdh      = syscall.NewLazyDLL("pdh.dll")
 
 	ProcGetSystemTimes           = Modkernel32.NewProc("GetSystemTimes")
 	ProcNtQuerySystemInformation = ModNt.NewProc("NtQuerySystemInformation")
@@ -81,13 +77,13 @@ func BytePtrToString(p *uint8) string {
 type CounterInfo struct {
 	PostName    string
 	CounterName string
-	Counter     windows.Handle
+	Counter     syscall.Handle
 }
 
 // CreateQuery XXX
 // copied from https://github.com/mackerelio/mackerel-agent/
-func CreateQuery() (windows.Handle, error) {
-	var query windows.Handle
+func CreateQuery() (syscall.Handle, error) {
+	var query syscall.Handle
 	r, _, err := PdhOpenQuery.Call(0, 0, uintptr(unsafe.Pointer(&query)))
 	if r != 0 {
 		return 0, err
@@ -96,11 +92,11 @@ func CreateQuery() (windows.Handle, error) {
 }
 
 // CreateCounter XXX
-func CreateCounter(query windows.Handle, pname, cname string) (*CounterInfo, error) {
-	var counter windows.Handle
+func CreateCounter(query syscall.Handle, pname, cname string) (*CounterInfo, error) {
+	var counter syscall.Handle
 	r, _, err := PdhAddCounter.Call(
 		uintptr(query),
-		uintptr(unsafe.Pointer(windows.StringToUTF16Ptr(cname))),
+		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(cname))),
 		0,
 		uintptr(unsafe.Pointer(&counter)))
 	if r != 0 {
@@ -111,19 +107,4 @@ func CreateCounter(query windows.Handle, pname, cname string) (*CounterInfo, err
 		CounterName: cname,
 		Counter:     counter,
 	}, nil
-}
-
-// WMIQueryWithContext - wraps wmi.Query with a timed-out context to avoid hanging
-func WMIQueryWithContext(ctx context.Context, query string, dst interface{}, connectServerArgs ...interface{}) error {
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- wmi.Query(query, dst, connectServerArgs...)
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-errChan:
-		return err
-	}
 }

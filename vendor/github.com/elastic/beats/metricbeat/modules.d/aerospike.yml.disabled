@@ -1,8 +1,5 @@
-# Module: aerospike
-# Docs: https://www.elastic.co/guide/en/beats/metricbeat/master/metricbeat-module-aerospike.html
-
 - module: aerospike
-  #metricsets:
-  #  - namespace
+  metricsets: ["namespace"]
+  enabled: false
   period: 10s
   hosts: ["localhost:3000"]

@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/joeshaw/multierror"
+	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/monitoring"
 	"github.com/elastic/beats/libbeat/paths"
@@ -45,7 +46,7 @@ type Reload struct {
 }
 
 type RunnerFactory interface {
-	Create(p beat.Pipeline, config *common.Config, meta *common.MapStrPointer) (Runner, error)
+	Create(config *common.Config, meta *common.MapStrPointer) (Runner, error)
 }
 
 type Runner interface {
@@ -55,16 +56,15 @@ type Runner interface {
 
 // Reloader is used to register and reload modules
 type Reloader struct {
-	pipeline      beat.Pipeline
-	runnerFactory RunnerFactory
-	config        DynamicConfig
-	path          string
-	done          chan struct{}
-	wg            sync.WaitGroup
+	registry *Registry
+	config   DynamicConfig
+	path     string
+	done     chan struct{}
+	wg       sync.WaitGroup
 }
 
 // NewReloader creates new Reloader instance for the given config
-func NewReloader(pipeline beat.Pipeline, cfg *common.Config) *Reloader {
+func NewReloader(cfg *common.Config) *Reloader {
 	config := DefaultDynamicConfig
 	cfg.Unpack(&config)
 
@@ -73,8 +73,12 @@ func NewReloader(pipeline beat.Pipeline, cfg *common.Config) *Reloader {
 		path = paths.Resolve(paths.Config, path)
 	}
 
+	if config.Reload.Enabled {
+		cfgwarn.Beta("Dynamic config reload is enabled.")
+	}
+
 	return &Reloader{
-		pipeline: pipeline,
+		registry: NewRegistry(),
 		config:   config,
 		path:     path,
 		done:     make(chan struct{}),
@@ -107,10 +111,10 @@ func (rl *Reloader) Check(runnerFactory RunnerFactory) error {
 	// Initialize modules
 	for _, c := range configs {
 		// Only add configs to startList which are enabled
-		if !c.Config.Enabled() {
+		if !c.Enabled() {
 			continue
 		}
-		_, err := runnerFactory.Create(rl.pipeline, c.Config, c.Meta)
+		_, err := runnerFactory.Create(c, nil)
 		if err != nil {
 			return err
 		}
@@ -122,13 +126,11 @@ func (rl *Reloader) Check(runnerFactory RunnerFactory) error {
 func (rl *Reloader) Run(runnerFactory RunnerFactory) {
 	logp.Info("Config reloader started")
 
-	list := NewRunnerList("reload", runnerFactory, rl.pipeline)
-
 	rl.wg.Add(1)
 	defer rl.wg.Done()
 
 	// Stop all running modules when method finishes
-	defer list.Stop()
+	defer rl.stopRunners(rl.registry.CopyList())
 
 	gw := NewGlobWatcher(rl.path)
 
@@ -144,8 +146,8 @@ func (rl *Reloader) Run(runnerFactory RunnerFactory) {
 		case <-rl.done:
 			logp.Info("Dynamic config reloader stopped")
 			return
-
 		case <-time.After(rl.config.Reload.Period):
+
 			debugf("Scan for new config files")
 			configReloads.Add(1)
 
@@ -167,10 +169,49 @@ func (rl *Reloader) Run(runnerFactory RunnerFactory) {
 
 			debugf("Number of module configs found: %v", len(configs))
 
-			if err := list.Reload(configs); err != nil {
-				// Make sure the next run also updates because some runners were not properly loaded
-				overwriteUpdate = true
+			startList := map[uint64]Runner{}
+			stopList := rl.registry.CopyList()
+
+			for _, c := range configs {
+
+				// Only add configs to startList which are enabled
+				if !c.Enabled() {
+					continue
+				}
+
+				rawCfg := map[string]interface{}{}
+				err := c.Unpack(rawCfg)
+
+				if err != nil {
+					logp.Err("Unable to unpack config file due to error: %v", err)
+					continue
+				}
+
+				hash, err := hashstructure.Hash(rawCfg, nil)
+				if err != nil {
+					// Make sure the next run also updates because some runners were not properly loaded
+					overwriteUpdate = true
+					debugf("Unable to generate hash for config file %v due to error: %v", c, err)
+					continue
+				}
+
+				debugf("Remove module from stoplist: %v", hash)
+				delete(stopList, hash)
+
+				// As module already exist, it must be removed from the stop list and not started
+				if !rl.registry.Has(hash) {
+					debugf("Add module to startlist: %v", hash)
+					runner, err := runnerFactory.Create(c, nil)
+					if err != nil {
+						logp.Err("Unable to create runner due to error: %v", err)
+						continue
+					}
+					startList[hash] = runner
+				}
 			}
+
+			rl.stopRunners(stopList)
+			rl.startRunners(startList)
 		}
 
 		// Path loading is enabled but not reloading. Loads files only once and then stops.
@@ -185,28 +226,70 @@ func (rl *Reloader) Run(runnerFactory RunnerFactory) {
 	}
 }
 
-func (rl *Reloader) loadConfigs(files []string) ([]*ConfigWithMeta, error) {
+func (rl *Reloader) loadConfigs(files []string) ([]*common.Config, error) {
 	// Load all config objects
-	result := []*ConfigWithMeta{}
+	configs := []*common.Config{}
 	var errs multierror.Errors
 	for _, file := range files {
-		configs, err := LoadList(file)
+		c, err := LoadList(file)
 		if err != nil {
 			errs = append(errs, err)
 			logp.Err("Error loading config: %s", err)
 			continue
 		}
 
-		for _, c := range configs {
-			result = append(result, &ConfigWithMeta{Config: c})
-		}
+		configs = append(configs, c...)
 	}
 
-	return result, errs.Err()
+	return configs, errs.Err()
 }
 
 // Stop stops the reloader and waits for all modules to properly stop
 func (rl *Reloader) Stop() {
 	close(rl.done)
 	rl.wg.Wait()
+}
+
+func (rl *Reloader) startRunners(list map[uint64]Runner) {
+	if len(list) == 0 {
+		return
+	}
+
+	logp.Info("Starting %v runners ...", len(list))
+	for id, runner := range list {
+		runner.Start()
+		rl.registry.Add(id, runner)
+
+		moduleStarts.Add(1)
+		moduleRunning.Add(1)
+		debugf("New runner started: %v", id)
+	}
+}
+
+func (rl *Reloader) stopRunners(list map[uint64]Runner) {
+	if len(list) == 0 {
+		return
+	}
+
+	logp.Info("Stopping %v runners ...", len(list))
+
+	wg := sync.WaitGroup{}
+	for hash, runner := range list {
+		wg.Add(1)
+
+		// Stop modules in parallel
+		go func(h uint64, run Runner) {
+			defer func() {
+				moduleStops.Add(1)
+				moduleRunning.Add(-1)
+				debugf("Runner stopped: %v", h)
+				wg.Done()
+			}()
+
+			run.Stop()
+			rl.registry.Remove(h)
+		}(hash, runner)
+	}
+
+	wg.Wait()
 }

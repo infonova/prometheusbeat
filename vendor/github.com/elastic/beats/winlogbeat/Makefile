@@ -5,9 +5,8 @@ SYSTEM_TESTS=true
 TEST_ENVIRONMENT=false
 
 GOX_OS=windows
-TARGETS?="windows/amd64 windows/386"
+TARGETS="windows/amd64 windows/386"
 PACKAGES=winlogbeat/win
-PACKAGES_EXPERIMENTAL=
 
 CGO=false		# don't need Cgo in Winlogbeat
 
@@ -23,4 +22,4 @@ before-build:
 
 # Collects all dependencies and then calls update
 .PHONY: collect
-collect: fields
+collect:

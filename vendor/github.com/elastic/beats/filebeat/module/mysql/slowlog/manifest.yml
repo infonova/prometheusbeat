@@ -11,4 +11,4 @@ var:
       - "c:/programdata/MySQL/MySQL Server*/mysql-slow.log*"
 
 ingest_pipeline: ingest/pipeline.json
-input: config/slowlog.yml
+prospector: config/slowlog.yml

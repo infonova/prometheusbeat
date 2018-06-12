@@ -37,7 +37,7 @@ type Message struct {
 }
 
 func (m *Message) encode(pe packetEncoder) error {
-	pe.push(newCRC32Field(crcIEEE))
+	pe.push(&crc32Field{})
 
 	pe.putInt8(m.Version)
 
@@ -45,9 +45,7 @@ func (m *Message) encode(pe packetEncoder) error {
 	pe.putInt8(attributes)
 
 	if m.Version >= 1 {
-		if err := (Timestamp{&m.Timestamp}).encode(pe); err != nil {
-			return err
-		}
+		pe.putInt64(m.Timestamp.UnixNano() / int64(time.Millisecond))
 	}
 
 	err := pe.putBytes(m.Key)
@@ -106,7 +104,7 @@ func (m *Message) encode(pe packetEncoder) error {
 }
 
 func (m *Message) decode(pd packetDecoder) (err error) {
-	err = pd.push(newCRC32Field(crcIEEE))
+	err = pd.push(&crc32Field{})
 	if err != nil {
 		return err
 	}
@@ -116,20 +114,18 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	if m.Version > 1 {
-		return PacketDecodingError{fmt.Sprintf("unknown magic byte (%v)", m.Version)}
-	}
-
 	attribute, err := pd.getInt8()
 	if err != nil {
 		return err
 	}
 	m.Codec = CompressionCodec(attribute & compressionCodecMask)
 
-	if m.Version == 1 {
-		if err := (Timestamp{&m.Timestamp}).decode(pd); err != nil {
+	if m.Version >= 1 {
+		millis, err := pd.getInt64()
+		if err != nil {
 			return err
 		}
+		m.Timestamp = time.Unix(millis/1000, (millis%1000)*int64(time.Millisecond))
 	}
 
 	m.Key, err = pd.getBytes()

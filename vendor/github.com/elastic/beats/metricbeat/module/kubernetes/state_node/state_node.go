@@ -2,7 +2,7 @@ package state_node
 
 import (
 	"github.com/elastic/beats/libbeat/common"
-	p "github.com/elastic/beats/metricbeat/helper/prometheus"
+	"github.com/elastic/beats/metricbeat/helper"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/mb/parse"
 )
@@ -17,28 +17,6 @@ var (
 		DefaultScheme: defaultScheme,
 		DefaultPath:   defaultPath,
 	}.Build()
-
-	mapping = &p.MetricsMapping{
-		Metrics: map[string]p.MetricMap{
-			"kube_node_info":                            p.Metric(""),
-			"kube_node_status_allocatable_pods":         p.Metric("pod.allocatable.total"),
-			"kube_node_status_capacity_pods":            p.Metric("pod.capacity.total"),
-			"kube_node_status_capacity_memory_bytes":    p.Metric("memory.capacity.bytes"),
-			"kube_node_status_allocatable_memory_bytes": p.Metric("memory.allocatable.bytes"),
-			"kube_node_status_capacity_cpu_cores":       p.Metric("cpu.capacity.cores"),
-			"kube_node_status_allocatable_cpu_cores":    p.Metric("cpu.allocatable.cores"),
-			"kube_node_spec_unschedulable":              p.BooleanMetric("status.unschedulable"),
-			"kube_node_status_ready":                    p.LabelMetric("status.ready", "condition", false),
-		},
-
-		Labels: map[string]p.LabelMap{
-			"node": p.KeyLabel("name"),
-		},
-
-		ExtraFields: map[string]string{
-			mb.NamespaceKey: "node",
-		},
-	}
 )
 
 // init registers the MetricSet with the central registry.
@@ -55,20 +33,16 @@ func init() {
 // multiple fetch calls.
 type MetricSet struct {
 	mb.BaseMetricSet
-	prometheus p.Prometheus
+	prometheus *helper.Prometheus
 }
 
 // New create a new instance of the MetricSet
 // Part of new is also setting up the configuration by processing additional
 // configuration entries if needed.
 func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
-	prometheus, err := p.NewPrometheusClient(base)
-	if err != nil {
-		return nil, err
-	}
 	return &MetricSet{
 		BaseMetricSet: base,
-		prometheus:    prometheus,
+		prometheus:    helper.NewPrometheusClient(base),
 	}, nil
 }
 
@@ -76,5 +50,10 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 // It returns the event which is then forward to the output. In case of an error, a
 // descriptive error must be returned.
 func (m *MetricSet) Fetch() ([]common.MapStr, error) {
-	return m.prometheus.GetProcessedMetrics(mapping)
+	families, err := m.prometheus.GetFamilies()
+	if err != nil {
+		return nil, err
+	}
+
+	return eventMapping(families)
 }

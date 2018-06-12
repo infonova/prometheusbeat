@@ -56,8 +56,11 @@ func (pub *transPub) createEvent(requ, resp *message) beat.Event {
 		// resp_time in milliseconds
 		responseTime := int32(resp.Ts.Sub(requ.Ts).Nanoseconds() / 1e6)
 
-		source, dest := common.MakeEndpointPair(requ.Tuple.BaseTuple, requ.CmdlineTuple)
-		src, dst := &source, &dest
+		src := &common.Endpoint{
+			IP:   requ.Tuple.SrcIP.String(),
+			Port: requ.Tuple.SrcPort,
+			Proc: string(requ.CmdlineTuple.Src),
+		}
 
 		timestamp = requ.Ts
 		fields["responsetime"] = responseTime
@@ -82,6 +85,11 @@ func (pub *transPub) createEvent(requ, resp *message) beat.Event {
 			}
 		}
 
+		dst := &common.Endpoint{
+			IP:   requ.Tuple.DstIP.String(),
+			Port: requ.Tuple.DstPort,
+			Proc: string(requ.CmdlineTuple.Dst),
+		}
 		fields["dst"] = dst
 
 	} else {

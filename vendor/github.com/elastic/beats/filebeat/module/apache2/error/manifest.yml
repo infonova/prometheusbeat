@@ -11,4 +11,4 @@ var:
       - "C:/Program Files/Apache Software Foundation/Apache2.*/logs/error.log*"
 
 ingest_pipeline: ingest/pipeline.json
-input: config/error.yml
+prospector: config/error.yml

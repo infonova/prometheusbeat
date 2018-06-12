@@ -195,7 +195,7 @@ func TestDefaultMetricSet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	names, err := registry.DefaultMetricSets(moduleName)
+	names, err := registry.defaultMetricSets(moduleName)
 	if err != nil {
 		t.Fatal(err)
 	}

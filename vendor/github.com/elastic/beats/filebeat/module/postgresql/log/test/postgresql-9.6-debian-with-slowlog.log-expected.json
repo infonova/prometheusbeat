@@ -25,9 +25,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:36:42.585 CEST [4974] LOG:  database system was shut down at 2017-06-17 16:58:04 CEST",
       "fileset": {
@@ -44,7 +41,7 @@
       1501508202585
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -71,9 +68,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:36:42.605 CEST [4974] LOG:  MultiXact member wraparound protections are now enabled",
       "fileset": {
@@ -90,7 +84,7 @@
       1501508202605
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -117,9 +111,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:36:42.615 CEST [4978] LOG:  autovacuum launcher started",
       "fileset": {
@@ -136,7 +127,7 @@
       1501508202615
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -163,9 +154,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:36:42.616 CEST [4973] LOG:  database system is ready to accept connections",
       "fileset": {
@@ -182,7 +170,7 @@
       1501508202616
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -211,9 +199,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "fileset": {
         "module": "postgresql",
@@ -230,7 +215,7 @@
       1501508202956
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -260,9 +245,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "fileset": {
         "module": "postgresql",
@@ -279,7 +261,7 @@
       1501508203557
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -309,9 +291,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:36:44.104 CEST [4986] postgres@postgres LOG:  duration: 2.895 ms  statement: SELECT d.datname as \"Name\",\n\t       pg_catalog.pg_get_userbyid(d.datdba) as \"Owner\",\n\t       pg_catalog.pg_encoding_to_char(d.encoding) as \"Encoding\",\n\t       d.datcollate as \"Collate\",\n\t       d.datctype as \"Ctype\",\n\t       pg_catalog.array_to_string(d.datacl, E'\\n') AS \"Access privileges\"\n\tFROM pg_catalog.pg_database d\n\tORDER BY 1;",
       "fileset": {
@@ -328,7 +307,7 @@
       1501508204104
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -358,9 +337,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "fileset": {
         "module": "postgresql",
@@ -377,7 +353,7 @@
       1501508204642
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -406,9 +382,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:39:16.249 CEST [5407] postgres@users FATAL:  database \"users\" does not exist",
       "fileset": {
@@ -425,7 +398,7 @@
       1501508356249
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -454,9 +427,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "fileset": {
         "module": "postgresql",
@@ -473,7 +443,7 @@
       1501508357945
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -503,9 +473,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:39:21.025 CEST [5404] postgres@postgres LOG:  duration: 37.598 ms  statement: SELECT n.nspname as \"Schema\",\n\t  c.relname as \"Name\",\n\t  CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' END as \"Type\",\n\t  pg_catalog.pg_get_userbyid(c.relowner) as \"Owner\"\n\tFROM pg_catalog.pg_class c\n\t     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace\n\tWHERE c.relkind IN ('r','')\n\t      AND n.nspname <> 'pg_catalog'\n\t      AND n.nspname <> 'information_schema'\n\t      AND n.nspname !~ '^pg_toast'\n\t  AND pg_catalog.pg_table_is_visible(c.oid)\n\tORDER BY 1,2;",
       "fileset": {
@@ -522,7 +489,7 @@
       1501508361025
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -552,9 +519,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:39:31.619 CEST [5502] postgres@clients LOG:  duration: 9.482 ms  statement: select * from clients;",
       "fileset": {
@@ -571,7 +535,7 @@
       1501508371619
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -601,9 +565,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "fileset": {
         "module": "postgresql",
@@ -620,7 +581,7 @@
       1501508380147
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -650,9 +611,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:40:54.310 CEST [5502] postgres@clients LOG:  duration: 26.082 ms  statement: SELECT n.nspname as \"Schema\",\n\t  c.relname as \"Name\",\n\t  CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 's' THEN 'special' WHEN 'f' THEN 'foreign table' END as \"Type\",\n\t  pg_catalog.pg_get_userbyid(c.relowner) as \"Owner\"\n\tFROM pg_catalog.pg_class c\n\t     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace\n\tWHERE c.relkind IN ('r','')\n\t      AND n.nspname <> 'pg_catalog'\n\t      AND n.nspname <> 'information_schema'\n\t      AND n.nspname !~ '^pg_toast'\n\t  AND pg_catalog.pg_table_is_visible(c.oid)\n\tORDER BY 1,2;",
       "fileset": {
@@ -669,7 +627,7 @@
       1501508454310
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -699,9 +657,6 @@
       "prospector": {
         "type": "log"
       },
-      "input": {
-        "type": "log"
-      },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
       "message": "2017-07-31 13:43:22.645 CEST [5502] postgres@clients LOG:  duration: 36.162 ms  statement: create table cats(name varchar(50) primary key, toy varchar (50) not null, born timestamp not null);",
       "fileset": {
@@ -718,7 +673,7 @@
       1501508602645
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -732,7 +687,7 @@
         "log": {
           "duration": "10.540",
           "thread_id": "5502",
-          "database": "c$lients",
+          "database": "clients",
           "level": "LOG",
           "timezone": "CEST",
           "query": "insert into cats(name, toy, born) values('kate', 'ball', now());",
@@ -746,9 +701,6 @@
         "version": "7.0.0-alpha1"
       },
       "prospector": {
-        "type": "log"
-      },
-      "input": {
         "type": "log"
       },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
@@ -767,7 +719,7 @@
       1501508762670
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -781,7 +733,7 @@
         "log": {
           "duration": "5.156",
           "thread_id": "5502",
-          "database": "_clients$db",
+          "database": "clients",
           "level": "LOG",
           "timezone": "CEST",
           "query": "insert into cats(name, toy, born) values('frida', 'horse', now());",
@@ -795,9 +747,6 @@
         "version": "7.0.0-alpha1"
       },
       "prospector": {
-        "type": "log"
-      },
-      "input": {
         "type": "log"
       },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",
@@ -816,7 +765,7 @@
       1501508783016
     ]
   },
-
+  
   {
     "_index": "filebeat-7.0.0-alpha1-2017.08.01",
     "_type": "doc",
@@ -830,7 +779,7 @@
         "log": {
           "duration": "25.871",
           "thread_id": "5502",
-          "database": "clients_db",
+          "database": "clients",
           "level": "LOG",
           "timezone": "CEST",
           "query": "create table dogs(name varchar(50) primary key, owner varchar (50) not null, born timestamp not null);",
@@ -844,9 +793,6 @@
         "version": "7.0.0-alpha1"
       },
       "prospector": {
-        "type": "log"
-      },
-      "input": {
         "type": "log"
       },
       "source": "/home/n/go/src/github.com/elastic/beats/filebeat/module/postgresql/log/test/postgresql-9.6-debian.log",

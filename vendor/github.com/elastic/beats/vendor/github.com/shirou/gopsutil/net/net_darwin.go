@@ -3,7 +3,6 @@
 package net
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -19,7 +18,7 @@ var (
 
 const endOfLine = "\n"
 
-func parseNetstatLine(line string) (stat *IOCountersStat, linkID *uint, err error) {
+func parseNetstatLine(line string) (stat *IOCountersStat, linkId *uint, err error) {
 	var (
 		numericValue uint64
 		columns      = strings.Fields(line)
@@ -36,8 +35,8 @@ func parseNetstatLine(line string) (stat *IOCountersStat, linkID *uint, err erro
 		if err != nil {
 			return
 		}
-		linkIDUint := uint(numericValue)
-		linkID = &linkIDUint
+		linkIdUint := uint(numericValue)
+		linkId = &linkIdUint
 	}
 
 	base := 1
@@ -92,7 +91,7 @@ func parseNetstatLine(line string) (stat *IOCountersStat, linkID *uint, err erro
 }
 
 type netstatInterface struct {
-	linkID *uint
+	linkId *uint
 	stat   *IOCountersStat
 }
 
@@ -113,7 +112,7 @@ func parseNetstatOutput(output string) ([]netstatInterface, error) {
 
 	for index := 0; index < numberInterfaces; index++ {
 		nsIface := netstatInterface{}
-		if nsIface.stat, nsIface.linkID, err = parseNetstatLine(lines[index+1]); err != nil {
+		if nsIface.stat, nsIface.linkId, err = parseNetstatLine(lines[index+1]); err != nil {
 			return nil, err
 		}
 		interfaces[index] = nsIface
@@ -127,7 +126,7 @@ type mapInterfaceNameUsage map[string]uint
 func newMapInterfaceNameUsage(ifaces []netstatInterface) mapInterfaceNameUsage {
 	output := make(mapInterfaceNameUsage)
 	for index := range ifaces {
-		if ifaces[index].linkID != nil {
+		if ifaces[index].linkId != nil {
 			ifaceName := ifaces[index].stat.Name
 			usage, ok := output[ifaceName]
 			if ok {
@@ -165,10 +164,6 @@ func (min mapInterfaceNameUsage) notTruncated() []string {
 // lo0   16384 ::1/128     ::1                 869107     -  169411755   869107     -  169411755     -   -
 // lo0   16384 127           127.0.0.1         869107     -  169411755   869107     -  169411755     -   -
 func IOCounters(pernic bool) ([]IOCountersStat, error) {
-	return IOCountersWithContext(context.Background(), pernic)
-}
-
-func IOCountersWithContext(ctx context.Context, pernic bool) ([]IOCountersStat, error) {
 	var (
 		ret      []IOCountersStat
 		retIndex int
@@ -197,7 +192,7 @@ func IOCountersWithContext(ctx context.Context, pernic bool) ([]IOCountersStat, 
 	if !ifaceUsage.isTruncated() {
 		// no truncated interface name, return stats of all interface with <Link#...>
 		for index := range nsInterfaces {
-			if nsInterfaces[index].linkID != nil {
+			if nsInterfaces[index].linkId != nil {
 				ret[retIndex] = *nsInterfaces[index].stat
 				retIndex++
 			}
@@ -217,7 +212,7 @@ func IOCountersWithContext(ctx context.Context, pernic bool) ([]IOCountersStat, 
 		for _, interfaceName := range interfaceNames {
 			truncated := true
 			for index := range nsInterfaces {
-				if nsInterfaces[index].linkID != nil && nsInterfaces[index].stat.Name == interfaceName {
+				if nsInterfaces[index].linkId != nil && nsInterfaces[index].stat.Name == interfaceName {
 					// handle the non truncated name to avoid execute netstat for them again
 					ret[retIndex] = *nsInterfaces[index].stat
 					retIndex++
@@ -239,7 +234,7 @@ func IOCountersWithContext(ctx context.Context, pernic bool) ([]IOCountersStat, 
 					continue
 				}
 				for index := range parsedIfaces {
-					if parsedIfaces[index].linkID != nil {
+					if parsedIfaces[index].linkId != nil {
 						ret = append(ret, *parsedIfaces[index].stat)
 						break
 					}
@@ -256,18 +251,10 @@ func IOCountersWithContext(ctx context.Context, pernic bool) ([]IOCountersStat, 
 
 // NetIOCountersByFile is an method which is added just a compatibility for linux.
 func IOCountersByFile(pernic bool, filename string) ([]IOCountersStat, error) {
-	return IOCountersByFileWithContext(context.Background(), pernic, filename)
-}
-
-func IOCountersByFileWithContext(ctx context.Context, pernic bool, filename string) ([]IOCountersStat, error) {
 	return IOCounters(pernic)
 }
 
 func FilterCounters() ([]FilterStat, error) {
-	return FilterCountersWithContext(context.Background())
-}
-
-func FilterCountersWithContext(ctx context.Context) ([]FilterStat, error) {
 	return nil, errors.New("NetFilterCounters not implemented for darwin")
 }
 
@@ -276,9 +263,5 @@ func FilterCountersWithContext(ctx context.Context) ([]FilterStat, error) {
 // just the protocols in the list are returned.
 // Not Implemented for Darwin
 func ProtoCounters(protocols []string) ([]ProtoCountersStat, error) {
-	return ProtoCountersWithContext(context.Background(), protocols)
-}
-
-func ProtoCountersWithContext(ctx context.Context, protocols []string) ([]ProtoCountersStat, error) {
 	return nil, errors.New("NetProtoCounters not implemented for darwin")
 }

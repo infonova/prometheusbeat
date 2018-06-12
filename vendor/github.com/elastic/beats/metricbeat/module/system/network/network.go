@@ -17,10 +17,9 @@ import (
 var debugf = logp.MakeDebug("system-network")
 
 func init() {
-	mb.Registry.MustAddMetricSet("system", "network", New,
-		mb.WithHostParser(parse.EmptyHostParser),
-		mb.DefaultMetricSet(),
-	)
+	if err := mb.Registry.AddMetricSet("system", "network", New, parse.EmptyHostParser); err != nil {
+		panic(err)
+	}
 }
 
 // MetricSet for fetching system network IO metrics.
