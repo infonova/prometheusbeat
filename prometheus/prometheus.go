@@ -3,7 +3,9 @@ package prometheus
 import (
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
+	"strings"
 
 	"github.com/elastic/beats/libbeat/common"
 
@@ -70,12 +72,17 @@ func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http
 		event := map[string]interface{}{}
 		labels := map[string]interface{}{}
 		for _, l := range ts.Labels {
-			labels[l.Name] = l.Value
+			fieldName := strings.Replace(l.Name, "_", "", -1)
+			labels[fieldName] = l.Value
 		}
 		event["labels"] = labels
 
 		for _, s := range ts.Samples {
-			event["value"] = s.Value
+			if math.IsNaN(s.Value) {
+				event["tags"] = []string{"nan"}
+			} else {
+				event["value"] = s.Value
+			}
 			event["timestamp"] = s.Timestamp
 		}
 

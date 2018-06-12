@@ -62,6 +62,7 @@ func (bt *Prometheusbeat) Run(b *beat.Beat) error {
 					"name":   pevent["name"],
 					"value":  pevent["value"],
 					"labels": pevent["labels"],
+					"tags":   pevent["tags"],
 				},
 			}
 			bt.client.Publish(event)
