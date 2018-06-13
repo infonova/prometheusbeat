@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/elastic/beats/libbeat/common"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/snappy"
 
-	"github.com/prometheus/prometheus/prompb"
-
+	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/logp"
+	version "github.com/hashicorp/go-version"
 	"github.com/infonova/prometheusbeat/config"
+	"github.com/prometheus/prometheus/prompb"
 )
 
 type PrometheusServer struct {
@@ -39,10 +39,22 @@ func (promSrv *PrometheusServer) Start(events chan common.MapStr) {
 
 func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http.Request) {
 
+	v := r.Header.Get("X-Prometheus-Remote-Write-Version")
+	//No header indicates old prometheus version
+	if len(v) == 0 {
+		v = "0.0.0"
+	}
+
+	baseVer, _ := version.NewVersion("0.1.0")
+	reqVer, err := version.NewVersion(v)
+	if err != nil {
+		logp.Err(strings.Join([]string{"wrong prometheus remote write version:", v}, " "))
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	var reqBuf []byte
-	var err error
-	// Handle breaking change between Prometheus versions
-	if promSrv.config.Version == 1 {
+	if reqVer.LessThan(baseVer) {
 		reqBuf, err = ioutil.ReadAll(snappy.NewReader(r.Body))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
