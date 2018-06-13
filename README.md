@@ -8,11 +8,6 @@ Example Prometheusbeat configuration:
 prometheusbeat:
   listen: ":8080"
   context: "/prometheus"
-  # The storage request format had a breaking change starting with Prometheus 1.7.
-  # Set the version accordingly.
-  # 1: Prometheus < 1.7
-  # 2: Prometheus >= 1.7
-  version: 2
 
 [...]
 ```
