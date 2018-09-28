@@ -5,17 +5,12 @@
 prometheusbeat:
   listen: ":8080"
   context: "/prometheus"
-  # The storage request format had a breaking change starting with Prometheus 1.7.
-  # Set the version accordingly.
-  # 1: Prometheus < 1.7
-  # 2: Prometheus >= 1.7
-  version: 2
 
 #================================ General =====================================
 
 # The name of the shipper that publishes the network data. It can be used to group
 # all the transactions sent by a single shipper in the web interface.
-#name: 
+#name:
 
 # The tags of the shipper are included in their own field with each
 # transaction published.
