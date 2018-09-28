@@ -68,8 +68,8 @@ ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 
 
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
-
 RUN mkdir -p /home/prometheusbeat-config
+
 WORKDIR $GOPATH
 
 RUN go get github.com/infonova/prometheusbeat
@@ -79,5 +79,4 @@ RUN go build
 EXPOSE 8080
 
 CMD ["./prometheusbeat -c /home/prometheusbeat-config/prometheusbeat.yml"]
-
 
