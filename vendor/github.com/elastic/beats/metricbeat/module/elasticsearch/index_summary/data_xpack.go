@@ -1,3 +1,20 @@
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 package index_summary
 
 import (
@@ -82,7 +99,7 @@ func eventMappingXPack(r mb.ReporterV2, m *MetricSet, info elasticsearch.Info, c
 	event := mb.Event{}
 	event.RootFields = common.MapStr{}
 	event.RootFields.Put("indices_stats._all", fields)
-	event.RootFields.Put("cluser_uuid", info.ClusterID)
+	event.RootFields.Put("cluster_uuid", info.ClusterID)
 	event.RootFields.Put("timestamp", common.Time(time.Now()))
 	event.RootFields.Put("interval_ms", m.Module().Config().Period/time.Millisecond)
 	event.RootFields.Put("type", "indices_stats")

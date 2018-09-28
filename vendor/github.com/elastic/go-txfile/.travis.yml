@@ -1,0 +1,35 @@
+language: go
+
+os:
+  - linux
+  - osx
+
+go:
+  - '1.9'
+  - '1.10'
+  - 'tip'
+
+env:
+  global:
+    - GO_CROSS_VERSION='1.10'
+    - GO_CHECK_CROSS_SCRIPT='GOOS=$TARGET go build ./...'
+
+# Check we're testing the correct commit (Snippet from: https://github.com/travis-ci/travis-ci/issues/7459#issuecomment-287040521)
+before_install:
+  - |
+    if [[ "$TRAVIS_COMMIT" != "$(git rev-parse HEAD)" ]]; then
+      echo "Commit $(git rev-parse HEAD) doesn't match expected commit $TRAVIS_COMMIT"
+    fi
+
+jobs:
+  include:
+    # try to cross compile to untested OSes
+    - env: TARGET=openbsd
+      go: $GO_CROSS_VERSION
+      script: eval $GO_CHECK_CROSS_SCRIPT
+    - env: TARGET=netbsd
+      go: $GO_CROSS_VERSION
+      script: eval $GO_CHECK_CROSS_SCRIPT
+    - env: TARGET=freebsd
+      go: $GO_CROSS_VERSION
+      script: eval $GO_CHECK_CROSS_SCRIPT
