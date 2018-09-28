@@ -153,7 +153,6 @@ cd ${GOPATH}/github.com/infonova/prometheusbeat
 git clone https://github.com/infonova/prometheusbeat
 ```
 
-
 For further development, check out the [beat developer guide](https://www.elastic.co/guide/en/beats/libbeat/current/new-beat.html).
 
 
@@ -166,3 +165,20 @@ make package
 ```
 
 This will fetch and create all images required for the build process. The whole process to finish can take several minutes.
+
+
+## Building Docker Image
+
+Prometheusbeat Docker image can be customized and build to run on any environments
+
+```
+docker build . -t infonova/prometheusbeat:latest
+```
+
+## Running Docker Image
+
+Prometheusbeat Docker image can be run using below command
+
+```
+docker run -itd  --name prometheusbeat -p <<dockerhost-port>>:8080 -v <<host-config-path>>:/home/prometheusbeat-config/prometheusbeat.yml infonova/prometheusbeat
+```
