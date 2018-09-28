@@ -6,7 +6,7 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/boernd/mybeat/cmd"
+	"github.com/infonova/prometheusbeat/cmd"
 )
 
 var systemTest *bool

@@ -1,9 +1,28 @@
+// Licensed to Elasticsearch B.V. under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. Elasticsearch B.V. licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 package elasticsearch
 
 import (
 	"errors"
 	"fmt"
 	"sync"
+
+	uuid "github.com/satori/go.uuid"
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
@@ -32,20 +51,48 @@ var (
 	ErrResponseRead = errors.New("bulk item status parse failed")
 )
 
+// Callbacks must not depend on the result of a previous one,
+// because the ordering is not fixed.
 type callbacksRegistry struct {
-	callbacks []connectCallback
+	callbacks map[uuid.UUID]connectCallback
 	mutex     sync.Mutex
 }
 
 // XXX: it would be fantastic to do this without a package global
-var connectCallbackRegistry callbacksRegistry
+var connectCallbackRegistry = newCallbacksRegistry()
+
+func newCallbacksRegistry() callbacksRegistry {
+	return callbacksRegistry{
+		callbacks: make(map[uuid.UUID]connectCallback),
+	}
+}
 
 // RegisterConnectCallback registers a callback for the elasticsearch output
 // The callback is called each time the client connects to elasticsearch.
-func RegisterConnectCallback(callback connectCallback) {
+// It returns the key of the newly added callback, so it can be deregistered later.
+func RegisterConnectCallback(callback connectCallback) uuid.UUID {
 	connectCallbackRegistry.mutex.Lock()
 	defer connectCallbackRegistry.mutex.Unlock()
-	connectCallbackRegistry.callbacks = append(connectCallbackRegistry.callbacks, callback)
+
+	// find the next unique key
+	var key uuid.UUID
+	exists := true
+	for exists {
+		key = uuid.NewV4()
+		_, exists = connectCallbackRegistry.callbacks[key]
+	}
+
+	connectCallbackRegistry.callbacks[key] = callback
+	return key
+}
+
+// DeregisterConnectCallback deregisters a callback for the elasticsearch output
+// specified by its key. If a callback does not exist, nothing happens.
+func DeregisterConnectCallback(key uuid.UUID) {
+	connectCallbackRegistry.mutex.Lock()
+	defer connectCallbackRegistry.mutex.Unlock()
+
+	delete(connectCallbackRegistry.callbacks, key)
 }
 
 func makeES(
@@ -137,6 +184,7 @@ func makeES(
 			Timeout:          config.Timeout,
 			CompressionLevel: config.CompressionLevel,
 			Observer:         observer,
+			EscapeHTML:       config.EscapeHTML,
 		}, &connectCallbackRegistry)
 		if err != nil {
 			return outputs.Fail(err)
