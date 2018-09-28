@@ -15,7 +15,7 @@ include::../include/what-happens.asciidoc[]
 [float]
 === Compatibility
 
-The +{modulename}+ module was tested with logs from versions 2.11.
+The +{modulename}+ module was tested with logs from versions 0.9 and 1.11.
 
 include::../include/running-modules.asciidoc[]
 
@@ -49,7 +49,7 @@ To specify the same settings at the command line, you use:
 
 ["source","sh",subs="attributes"]
 -----
-./{beatname_lc} --modules {modulename} -M "kafka.log.var.paths=[/path/to/logs/controller.log*, /path/to/logs/server.log*, /path/to/logs/state-change.log*, /path/to/logs/kafka-*.log*]"
+-M "kafka.log.var.paths=[/path/to/logs/controller.log*, /path/to/logs/server.log*, /path/to/logs/state-change.log*, /path/to/logs/kafka-*.log*]"
 -----
 
 
@@ -62,6 +62,8 @@ include::../include/config-option-intro.asciidoc[]
 ==== `log` fileset settings
 
 include::../include/var-paths.asciidoc[]
+
+include::../include/var-convert-timezone.asciidoc[]
 
 
 [float]

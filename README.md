@@ -27,25 +27,26 @@ Example Prometheusbeat event:
 
 ```
 {
-  "@timestamp": "2018-06-12T10:33:28.122Z",
+  "@timestamp": "2018-09-28T11:44:07.006Z",
   "@metadata": {
     "beat": "prometheusbeat",
     "type": "doc",
-    "version": "7.0.0-alpha1"
+    "version": "6.4.1"
   },
   "labels": {
-    "job": "prometheus",
-    "__name__": "scrape_samples_post_metric_relabeling",
-    "instance": "localhost:9090"
+    "le": "10",
+    "name": "prometheus_tsdb_tombstone_cleanup_seconds_bucket",
+    "instance": "localhost:9090",
+    "job": "prometheus"
   },
-  "value": 349,
-  "beat": {
-    "name": "prometheusbeat",
-    "hostname": "example.com",
-    "version": "7.0.0-alpha1"
-  },
+  "value": 0,
   "host": {
-    "name": "prometheusbeat"
+    "name": "example.com"
+  },
+  "beat": {
+    "version": "6.4.1",
+    "name": "prometheusbeat",
+    "hostname": "example.com"
   }
 }
 ```
@@ -152,7 +153,8 @@ cd ${GOPATH}/github.com/infonova/prometheusbeat
 git clone https://github.com/infonova/prometheusbeat
 ```
 
-This will fetch and create all images required for the build process. The hole process to finish can take several minutes.
+For further development, check out the [beat developer guide](https://www.elastic.co/guide/en/beats/libbeat/current/new-beat.html).
+
 
 ## Packaging
 
@@ -162,11 +164,8 @@ The beat frameworks provides tools to crosscompile and package your beat for dif
 make package
 ```
 
-This will fetch and create all images required for the build process. The hole process to finish can take several minutes.
+This will fetch and create all images required for the build process. The whole process to finish can take several minutes.
 
-
-
-For further development, check out the [beat developer guide](https://www.elastic.co/guide/en/beats/libbeat/current/new-beat.html).
 
 ## Building Docker Image
 
