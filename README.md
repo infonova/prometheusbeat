@@ -180,5 +180,5 @@ docker build . -t infonova/prometheusbeat:latest
 Prometheusbeat Docker image can be run using below command
 
 ```
-docker run -itd  --name prometheusbeat -p <<dockerhost-port>>:8080 -v <<host-config-path>>:/home/prometheusbeat-config/prometheusbeat.yml infonova/prometheusbeat
+docker run -d  --name prometheusbeat -p <<dockerhost-port>>:8080 -v <<host-config-path>>:/prometheusbeat.yml infonova/prometheusbeat:latest
 ```
