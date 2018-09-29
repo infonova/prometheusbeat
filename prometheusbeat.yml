@@ -3,8 +3,13 @@
 ############################# Prometheusbeat ######################################
 
 prometheusbeat:
+  # Listen port of the server. Defaults to :8080
   listen: ":8080"
+  # Context path. Defaults to /prometheus
   context: "/prometheus"
+
+  # If this setting is set to true the metric name field is stored as a top-level field. Defaults to false
+  name_under_root: true
 
 #================================ General =====================================
 

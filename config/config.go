@@ -4,11 +4,13 @@
 package config
 
 type Config struct {
-	Listen  string `config:"listen"`
-	Context string `config:"context"`
+	Listen        string `config:"listen"`
+	Context       string `config:"context"`
+	NameUnderRoot bool   `config:"name_under_root"`
 }
 
 var DefaultConfig = Config{
-	Listen:  ":8080",
-	Context: "/prometheus",
+	Listen:        ":8080",
+	Context:       "/prometheus",
+	NameUnderRoot: false,
 }

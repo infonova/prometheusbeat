@@ -84,8 +84,12 @@ func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http
 		event := map[string]interface{}{}
 		labels := map[string]interface{}{}
 		for _, l := range ts.Labels {
-			fieldName := strings.Replace(l.Name, "_", "", -1)
-			labels[fieldName] = l.Value
+			fieldName := strings.Trim(l.Name, "_")
+			if fieldName == "name" && promSrv.config.NameUnderRoot {
+				event[fieldName] = l.Value
+			} else {
+				labels[fieldName] = l.Value
+			}
 		}
 		event["labels"] = labels
 
