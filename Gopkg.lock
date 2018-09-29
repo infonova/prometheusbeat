@@ -145,6 +145,7 @@
   digest = "1:47fcaecbe7b2d5bd5361b65138943ea223db9bbf596778175f1bdae6e8c55035"
   name = "github.com/elastic/beats"
   packages = [
+    "dev-tools/mage",
     "libbeat/api",
     "libbeat/asset",
     "libbeat/autodiscover",
@@ -512,6 +513,19 @@
   revision = "b729f2633dfe35f4d1d8a32385f6685610ce1cb5"
 
 [[projects]]
+  digest = "1:648d6fffa08b772d40a7801e7db5feaac9f43f3da914b205459ba47a35d0b073"
+  name = "github.com/magefile/mage"
+  packages = [
+    "mg",
+    "sh",
+    "target",
+    "types",
+  ]
+  pruneopts = "UT"
+  revision = "49bafb86c808d73cabc5353d9ec040745dfab453"
+  version = "v1.4.0"
+
+[[projects]]
   digest = "1:c658e84ad3916da105a761660dcaeb01e63416c8ec7bc62256a9b411a05fcd67"
   name = "github.com/mattn/go-colorable"
   packages = ["."]
@@ -725,6 +739,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:4a3868eae7ea7a797d767f453a83f27a7f5b6234f1bf1b9149aab50237b3f1a5"
+  name = "golang.org/x/tools"
+  packages = ["go/vcs"]
+  pruneopts = "UT"
+  revision = "e9ca907325a54929174f01b115742dbac294b788"
+
+[[projects]]
+  branch = "master"
   digest = "1:ec1919b8b80839559effbe3eabcebf92238d12d3dd9182e51deb5da3ed12e5e9"
   name = "google.golang.org/genproto"
   packages = [
@@ -789,6 +811,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/elastic/beats/dev-tools/mage",
     "github.com/elastic/beats/libbeat/asset",
     "github.com/elastic/beats/libbeat/beat",
     "github.com/elastic/beats/libbeat/cmd",
@@ -797,6 +820,8 @@
     "github.com/golang/protobuf/proto",
     "github.com/golang/snappy",
     "github.com/hashicorp/go-version",
+    "github.com/magefile/mage/mg",
+    "github.com/magefile/mage/sh",
     "github.com/prometheus/prometheus/prompb",
   ]
   solver-name = "gps-cdcl"
