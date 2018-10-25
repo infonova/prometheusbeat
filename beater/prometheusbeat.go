@@ -56,8 +56,14 @@ func (bt *Prometheusbeat) Run(b *beat.Beat) error {
 		case <-bt.done:
 			return nil
 		case pevent = <-prometheusEvents:
+			// See #16
+			ts := time.Unix(0, time.Now().UnixNano())
+			if pevent["timestamp"] != nil {
+				ts = time.Unix(0, pevent["timestamp"].(int64)*1000000)
+			}
+
 			event := beat.Event{
-				Timestamp: time.Unix(0, pevent["timestamp"].(int64)*1000000),
+				Timestamp: ts,
 				Fields: common.MapStr{
 					"name":   pevent["name"],
 					"value":  pevent["value"],
