@@ -96,6 +96,8 @@ func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http
 		for _, s := range ts.Samples {
 			if math.IsNaN(s.Value) {
 				event["tags"] = []string{"nan"}
+			} else if math.IsInf(s.Value, 0) {
+				event["tags"] = []string{"inf"}
 			} else {
 				event["value"] = s.Value
 			}
