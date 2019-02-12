@@ -148,8 +148,8 @@ make clean
 To clone Prometheusbeat from the git repository, run the following commands:
 
 ```
-mkdir -p ${GOPATH}/github.com/infonova/prometheusbeat
-cd ${GOPATH}/github.com/infonova/prometheusbeat
+mkdir -p ${GOPATH}/github.com/infonova
+cd ${GOPATH}/github.com/infonova
 git clone https://github.com/infonova/prometheusbeat
 ```
 
