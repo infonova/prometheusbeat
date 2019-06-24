@@ -19,13 +19,14 @@ package cluster_stats
 
 import (
 	"encoding/json"
-	"fmt"
+
+	"github.com/pkg/errors"
 
 	"github.com/elastic/beats/libbeat/common"
-
 	s "github.com/elastic/beats/libbeat/common/schema"
 	c "github.com/elastic/beats/libbeat/common/schema/mapstriface"
 	"github.com/elastic/beats/metricbeat/mb"
+	"github.com/elastic/beats/metricbeat/module/elasticsearch"
 )
 
 var (
@@ -51,42 +52,28 @@ var (
 	}
 )
 
-// TODO: Remove this function and use the one implemented (currently) in the kibana
-// module, after extracting it into the metricbeat helper package
-func reportErrorForMissingField(field string, r mb.ReporterV2) error {
-	err := fmt.Errorf("Could not find field '%v' in Kibana stats API response", field)
-	r.Error(err)
-	return err
-}
+func eventMapping(r mb.ReporterV2, info elasticsearch.Info, content []byte) error {
+	var event mb.Event
+	event.RootFields = common.MapStr{}
+	event.RootFields.Put("service.name", elasticsearch.ModuleName)
 
-func eventMapping(r mb.ReporterV2, content []byte) error {
+	event.ModuleFields = common.MapStr{}
+	event.ModuleFields.Put("cluster.name", info.ClusterName)
+	event.ModuleFields.Put("cluster.id", info.ClusterID)
+
 	var data map[string]interface{}
 	err := json.Unmarshal(content, &data)
 	if err != nil {
-		r.Error(err)
-		return err
+		event.Error = errors.Wrap(err, "failure parsing Elasticsearch Cluster Stats API response")
+		r.Event(event)
+		return event.Error
 	}
 
 	metricSetFields, err := schema.Apply(data)
 	if err != nil {
-		r.Error(err)
-		return err
-	}
-
-	clusterName, ok := data["cluster_name"]
-	if !ok {
-		return reportErrorForMissingField("cluster_name", r)
-	}
-
-	var event mb.Event
-	event.RootFields = common.MapStr{}
-	event.RootFields.Put("service.name", "elasticsearch")
-
-	event.ModuleFields = common.MapStr{}
-	event.ModuleFields.Put("cluster.name", clusterName)
-	clusterUUID, ok := data["cluster_uuid"]
-	if ok {
-		event.ModuleFields.Put("cluster.id", clusterUUID)
+		event.Error = errors.Wrap(err, "failure applying cluster stats schema")
+		r.Event(event)
+		return event.Error
 	}
 
 	event.MetricSetFields = metricSetFields

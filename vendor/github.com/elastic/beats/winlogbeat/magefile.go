@@ -20,6 +20,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -56,6 +57,11 @@ func CrossBuild() error {
 	return mage.CrossBuild()
 }
 
+// CrossBuildXPack cross-builds the beat with XPack for all target platforms.
+func CrossBuildXPack() error {
+	return mage.CrossBuildXPack()
+}
+
 // CrossBuildGoDaemon cross-builds the go-daemon binary using Docker.
 func CrossBuildGoDaemon() error {
 	return mage.CrossBuildGoDaemon()
@@ -69,13 +75,14 @@ func Clean() error {
 // Package packages the Beat for distribution.
 // Use SNAPSHOT=true to build snapshots.
 // Use PLATFORMS to control the target platforms.
+// Use VERSION_QUALIFIER to control the version qualifier.
 func Package() {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
 	mage.UseElasticBeatPackaging()
 	mg.Deps(Update)
-	mg.Deps(CrossBuild, CrossBuildGoDaemon)
+	mg.Deps(CrossBuild, CrossBuildXPack, CrossBuildGoDaemon)
 	mg.SerialDeps(mage.Package, TestPackages)
 }
 
@@ -92,4 +99,18 @@ func Update() error {
 // Fields generates a fields.yml for the Beat.
 func Fields() error {
 	return mage.GenerateFieldsYAML()
+}
+
+// GoTestUnit executes the Go unit tests.
+// Use TEST_COVERAGE=true to enable code coverage profiling.
+// Use RACE_DETECTOR=true to enable the race detector.
+func GoTestUnit(ctx context.Context) error {
+	return mage.GoTest(ctx, mage.DefaultGoTestUnitArgs())
+}
+
+// GoTestIntegration executes the Go integration tests.
+// Use TEST_COVERAGE=true to enable code coverage profiling.
+// Use RACE_DETECTOR=true to enable the race detector.
+func GoTestIntegration(ctx context.Context) error {
+	return mage.GoTest(ctx, mage.DefaultGoTestIntegrationArgs())
 }

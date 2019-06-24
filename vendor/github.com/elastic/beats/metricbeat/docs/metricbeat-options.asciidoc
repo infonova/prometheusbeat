@@ -6,7 +6,7 @@ Metricbeat provides a couple different ways to enable modules and metricsets:
 * <<enable-modules-d-configs>>
 * <<enable-modules-config-file>>
 
-include::../../libbeat/docs/shared-note-file-permissions.asciidoc[]
+include::{libbeat-dir}/docs/shared-note-file-permissions.asciidoc[]
 
 [float]
 [[enable-modules-d-configs]]
@@ -201,11 +201,18 @@ See <<filtering-and-enhancing-data>> for information about specifying
 processors in your config.
 
 [float]
+==== `service.name`
+
+A name given by the user to the service the data is collected from. It can be
+used for example to identify information collected from nodes of different
+clusters with the same `service.type`.
+
+[float]
 [[module-http-config-options]]
 === Standard HTTP config options
 
-The modules and metricsets for which the host is defined as a HTTP URL, also
-support the following options:
+The following options are available for modules and metricsets that define the
+host as an HTTP URL:
 
 [float]
 ==== `username`
@@ -216,6 +223,24 @@ The username to use for basic authentication.
 ==== `password`
 
 The password to use for basic authentication.
+
+[float]
+==== `connect_timeout`
+
+Total time limit for an HTTP connection to be completed (Default: 2 seconds).
+
+[float]
+==== `timeout`
+
+Total time limit for HTTP requests made by the module (Default: 10 seconds).
+
+[float]
+==== `ssl`
+
+Configuration options for SSL parameters like the certificate authority to use
+for HTTPS-based connections.
+
+See <<configuration-ssl>> for more information.
 
 [float]
 ==== `headers`
@@ -240,3 +265,20 @@ and then use the value in an HTTP Authorization header.
 
 An optional base path to be used in HTTP URIs. If defined, Metricbeat will insert this value
 as the first segment in the HTTP URI path.
+
+[float]
+==== `query`
+
+An optional value to pass common query params in YAML. Instead of setting the query params 
+within hosts values using the syntax `?key=value&key2&value2`, you can set it here like this:
+
+[source,yaml]
+----
+query:
+  key: value
+  key2: value2
+  list:
+  - 1.1
+  - 2.95
+  - -15
+----

@@ -20,6 +20,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -56,6 +57,11 @@ func CrossBuild() error {
 	return mage.CrossBuild()
 }
 
+// CrossBuildXPack cross-builds the beat with XPack for all target platforms.
+func CrossBuildXPack() error {
+	return mage.CrossBuildXPack()
+}
+
 // CrossBuildGoDaemon cross-builds the go-daemon binary using Docker.
 func CrossBuildGoDaemon() error {
 	return mage.CrossBuildGoDaemon()
@@ -69,19 +75,22 @@ func Clean() error {
 // Package packages the Beat for distribution.
 // Use SNAPSHOT=true to build snapshots.
 // Use PLATFORMS to control the target platforms.
+// Use VERSION_QUALIFIER to control the version qualifier.
 func Package() {
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
 	mage.UseElasticBeatPackaging()
+	customizePackaging()
+
 	mg.Deps(Update)
-	mg.Deps(CrossBuild, CrossBuildGoDaemon)
+	mg.Deps(CrossBuild, CrossBuildXPack, CrossBuildGoDaemon)
 	mg.SerialDeps(mage.Package, TestPackages)
 }
 
 // TestPackages tests the generated packages (i.e. file modes, owners, groups).
 func TestPackages() error {
-	return mage.TestPackages()
+	return mage.TestPackages(mage.WithMonitorsD())
 }
 
 // Update updates the generated files (aka make update).
@@ -92,4 +101,40 @@ func Update() error {
 // Fields generates a fields.yml for the Beat.
 func Fields() error {
 	return mage.GenerateFieldsYAML("monitors/active")
+}
+
+// GoTestUnit executes the Go unit tests.
+// Use TEST_COVERAGE=true to enable code coverage profiling.
+// Use RACE_DETECTOR=true to enable the race detector.
+func GoTestUnit(ctx context.Context) error {
+	return mage.GoTest(ctx, mage.DefaultGoTestUnitArgs())
+}
+
+// GoTestIntegration executes the Go integration tests.
+// Use TEST_COVERAGE=true to enable code coverage profiling.
+// Use RACE_DETECTOR=true to enable the race detector.
+func GoTestIntegration(ctx context.Context) error {
+	return mage.GoTest(ctx, mage.DefaultGoTestIntegrationArgs())
+}
+
+func customizePackaging() {
+	monitorsDTarget := "monitors.d"
+	unixMonitorsDir := "/etc/{{.BeatName}}/monitors.d"
+	monitorsD := mage.PackageFile{
+		Mode:   0644,
+		Source: "monitors.d",
+	}
+
+	for _, args := range mage.Packages {
+		pkgType := args.Types[0]
+		switch pkgType {
+		case mage.Docker:
+			args.Spec.ExtraVar("linux_capabilities", "cap_net_raw=eip")
+			args.Spec.Files[monitorsDTarget] = monitorsD
+		case mage.TarGz, mage.Zip:
+			args.Spec.Files[monitorsDTarget] = monitorsD
+		case mage.Deb, mage.RPM, mage.DMG:
+			args.Spec.Files[unixMonitorsDir] = monitorsD
+		}
+	}
 }

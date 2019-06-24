@@ -27,6 +27,7 @@ import (
 
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/fmtstr"
+	"github.com/elastic/beats/libbeat/common/kafka"
 	"github.com/elastic/beats/libbeat/common/transport/tlscommon"
 	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/monitoring"
@@ -48,7 +49,7 @@ type kafkaConfig struct {
 	BrokerTimeout    time.Duration             `config:"broker_timeout"      validate:"min=1"`
 	Compression      string                    `config:"compression"`
 	CompressionLevel int                       `config:"compression_level"`
-	Version          string                    `config:"version"`
+	Version          kafka.Version             `config:"version"`
 	BulkMaxSize      int                       `config:"bulk_max_size"`
 	MaxRetries       int                       `config:"max_retries"         validate:"min=-1,nonzero"`
 	ClientID         string                    `config:"client_id"`
@@ -61,6 +62,7 @@ type kafkaConfig struct {
 type metaConfig struct {
 	Retry       metaRetryConfig `config:"retry"`
 	RefreshFreq time.Duration   `config:"refresh_frequency" validate:"min=0"`
+	Full        bool            `config:"full"`
 }
 
 type metaRetryConfig struct {
@@ -89,6 +91,7 @@ func defaultConfig() kafkaConfig {
 				Backoff: 250 * time.Millisecond,
 			},
 			RefreshFreq: 10 * time.Minute,
+			Full:        true,
 		},
 		KeepAlive:        0,
 		MaxMessageBytes:  nil, // use library default
@@ -96,13 +99,21 @@ func defaultConfig() kafkaConfig {
 		BrokerTimeout:    10 * time.Second,
 		Compression:      "gzip",
 		CompressionLevel: 4,
-		Version:          "1.0.0",
+		Version:          kafka.Version("1.0.0"),
 		MaxRetries:       3,
 		ClientID:         "beats",
 		ChanBufferSize:   256,
 		Username:         "",
 		Password:         "",
 	}
+}
+
+func readConfig(cfg *common.Config) (*kafkaConfig, error) {
+	c := defaultConfig()
+	if err := cfg.Unpack(&c); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }
 
 func (c *kafkaConfig) Validate() error {
@@ -114,8 +125,8 @@ func (c *kafkaConfig) Validate() error {
 		return fmt.Errorf("compression mode '%v' unknown", c.Compression)
 	}
 
-	if _, ok := kafkaVersions[c.Version]; !ok {
-		return fmt.Errorf("unknown/unsupported kafka version '%v'", c.Version)
+	if err := c.Version.Validate(); err != nil {
+		return err
 	}
 
 	if c.Username != "" && c.Password == "" {
@@ -168,6 +179,7 @@ func newSaramaConfig(config *kafkaConfig) (*sarama.Config, error) {
 	k.Metadata.Retry.Max = config.Metadata.Retry.Max
 	k.Metadata.Retry.Backoff = config.Metadata.Retry.Backoff
 	k.Metadata.RefreshFrequency = config.Metadata.RefreshFreq
+	k.Metadata.Full = config.Metadata.Full
 
 	// configure producer API properties
 	if config.MaxMessageBytes != nil {
@@ -200,7 +212,7 @@ func newSaramaConfig(config *kafkaConfig) (*sarama.Config, error) {
 	// configure client ID
 	k.ClientID = config.ClientID
 
-	version, ok := kafkaVersions[config.Version]
+	version, ok := config.Version.Get()
 	if !ok {
 		return nil, fmt.Errorf("Unknown/unsupported kafka version: %v", config.Version)
 	}

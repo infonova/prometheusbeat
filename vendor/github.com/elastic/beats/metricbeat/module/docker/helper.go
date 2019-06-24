@@ -29,17 +29,24 @@ import (
 type Container struct {
 	ID     string
 	Name   string
+	Image  string
 	Labels common.MapStr
 }
 
 func (c *Container) ToMapStr() common.MapStr {
 	m := common.MapStr{
-		"id":   c.ID,
-		"name": c.Name,
+		"container": common.MapStr{
+			"id":   c.ID,
+			"name": c.Name,
+			"image": common.MapStr{
+				"name": c.Image,
+			},
+			"runtime": "docker",
+		},
 	}
 
 	if len(c.Labels) > 0 {
-		m["labels"] = c.Labels
+		m.Put("docker.container.labels", c.Labels)
 	}
 	return m
 }
@@ -52,6 +59,7 @@ func NewContainer(container *types.Container, dedot bool) *Container {
 		ID:     container.ID,
 		Name:   ExtractContainerName(container.Names),
 		Labels: DeDotLabels(container.Labels, dedot),
+		Image:  container.Image,
 	}
 }
 

@@ -1,5 +1,5 @@
 # Module: system
-# Docs: https://www.elastic.co/guide/en/beats/metricbeat/6.4/metricbeat-module-system.html
+# Docs: https://www.elastic.co/guide/en/beats/metricbeat/7.1/metricbeat-module-system.html
 
 - module: system
   period: 10s
@@ -10,6 +10,7 @@
     - network
     - process
     - process_summary
+    - socket_summary
     #- core
     #- diskio
     #- socket

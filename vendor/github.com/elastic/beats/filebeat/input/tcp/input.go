@@ -18,6 +18,7 @@
 package tcp
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -29,7 +30,6 @@ import (
 	"github.com/elastic/beats/filebeat/util"
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
-	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
 )
 
@@ -56,7 +56,6 @@ func NewInput(
 	outlet channel.Connector,
 	context input.Context,
 ) (input.Input, error) {
-	cfgwarn.Experimental("TCP input type is used")
 
 	out, err := outlet(cfg, context.DynamicFields)
 	if err != nil {
@@ -76,7 +75,12 @@ func NewInput(
 		forwarder.Send(event)
 	}
 
-	server, err := tcp.New(&config.Config, cb)
+	splitFunc := tcp.SplitFunc([]byte(config.LineDelimiter))
+	if splitFunc == nil {
+		return nil, fmt.Errorf("unable to create splitFunc for delimiter %s", config.LineDelimiter)
+	}
+
+	server, err := tcp.New(&config.Config, splitFunc, cb)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +90,7 @@ func NewInput(
 		started: false,
 		outlet:  out,
 		config:  &config,
-		log:     logp.NewLogger("tcp input").With(config.Config.Host),
+		log:     logp.NewLogger("tcp input").With("address", config.Config.Host),
 	}, nil
 }
 
@@ -127,7 +131,11 @@ func createEvent(raw []byte, metadata inputsource.NetworkMetadata) *util.Data {
 		Timestamp: time.Now(),
 		Fields: common.MapStr{
 			"message": string(raw),
-			"source":  metadata.RemoteAddr.String(),
+			"log": common.MapStr{
+				"source": common.MapStr{
+					"address": metadata.RemoteAddr.String(),
+				},
+			},
 		},
 	}
 	return data

@@ -1,3 +1,6 @@
+# Module: redis
+# Docs: https://www.elastic.co/guide/en/beats/filebeat/7.1/filebeat-module-redis.html
+
 - module: redis
   # Main logs
   log:

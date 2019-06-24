@@ -18,118 +18,30 @@
 package main
 
 import (
-	"crypto/tls"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/http"
+	"log"
 	"net/url"
-	"os"
-	"path"
-	"strings"
+	"path/filepath"
+	"time"
 
-	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/dashboards"
 	"github.com/elastic/beats/libbeat/kibana"
 )
 
-var exportAPI = "/api/kibana/dashboards/export"
+var (
+	indexPattern = false
+	quiet        = false
+)
 
-type manifest struct {
-	Dashboards []map[string]string `config:"dashboards"`
-}
-
-func makeURL(url, path string, params url.Values) string {
-	if len(params) == 0 {
-		return url + path
-	}
-
-	return strings.Join([]string{url, path, "?", params.Encode()}, "")
-}
-
-func Export(client *http.Client, conn string, dashboard string, out string) error {
-	params := url.Values{}
-
-	params.Add("dashboard", dashboard)
-
-	fullURL := makeURL(conn, exportAPI, params)
-	if !quiet {
-		fmt.Printf("Calling HTTP GET %v\n", fullURL)
-	}
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("GET HTTP request fails with: %v", err)
-	}
-
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("fail to read response %s", err)
-	}
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("HTTP GET %s fails with %s, %s", fullURL, resp.Status, body)
-	}
-
-	data, err := kibana.RemoveIndexPattern(body)
-	if err != nil {
-		return fmt.Errorf("fail to extract the index pattern: %v", err)
-	}
-
-	objects := data["objects"].([]interface{})
-	for _, obj := range objects {
-		o := obj.(common.MapStr)
-
-		decodeValue(o, "attributes.uiStateJSON")
-		decodeValue(o, "attributes.visState")
-		decodeValue(o, "attributes.optionsJSON")
-		decodeValue(o, "attributes.panelsJSON")
-		decodeValue(o, "attributes.kibanaSavedObjectMeta.searchSourceJSON")
-	}
-
-	data["objects"] = objects
-	err = ioutil.WriteFile(out, []byte(data.StringToPrint()), 0666)
-	if !quiet {
-		fmt.Printf("The dashboard %s was exported under the %s file\n", dashboard, out)
-	}
-	return err
-}
-
-func decodeValue(data common.MapStr, key string) {
-	v, err := data.GetValue(key)
-	if err != nil {
-		return
-	}
-	s := v.(string)
-	var d common.MapStr
-	json.Unmarshal([]byte(s), &d)
-
-	data.Put(key, d)
-}
-
-func ReadManifest(file string) ([]map[string]string, error) {
-	cfg, err := common.LoadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("error reading manifest file: %v", err)
-	}
-
-	var manifest manifest
-	err = cfg.Unpack(&manifest)
-	if err != nil {
-		return nil, fmt.Errorf("error unpacking manifest: %v", err)
-	}
-	return manifest.Dashboards, nil
-}
-
-var indexPattern = false
-var quiet = false
+const (
+	kibanaTimeout = 90 * time.Second
+)
 
 func main() {
 	kibanaURL := flag.String("kibana", "http://localhost:5601", "Kibana URL")
+	spaceID := flag.String("space-id", "", "Space ID")
 	dashboard := flag.String("dashboard", "", "Dashboard ID")
 	fileOutput := flag.String("output", "output.json", "Output file")
 	ymlFile := flag.String("yml", "", "Path to the module.yml file containing the dashboards")
@@ -137,45 +49,81 @@ func main() {
 	flag.BoolVar(&quiet, "quiet", false, "be quiet")
 
 	flag.Parse()
+	log.SetFlags(0)
 
-	transCfg := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ignore expired SSL certificates
+	u, err := url.Parse(*kibanaURL)
+	if err != nil {
+		log.Fatalf("Error parsing Kibana URL: %v", err)
 	}
 
-	client := &http.Client{Transport: transCfg}
+	var user, pass string
+	if u.User != nil {
+		user = u.User.Username()
+		pass, _ = u.User.Password()
+	}
+	client, err := kibana.NewClientWithConfig(&kibana.ClientConfig{
+		Protocol: u.Scheme,
+		Host:     u.Host,
+		Username: user,
+		Password: pass,
+		Path:     u.Path,
+		SpaceID:  *spaceID,
+		Timeout:  kibanaTimeout,
+	})
+	if err != nil {
+		log.Fatalf("Error while connecting to Kibana: %v", err)
+	}
 
 	if len(*ymlFile) == 0 && len(*dashboard) == 0 {
-		fmt.Printf("Please specify a dashboard ID (-dashboard) or a manifest file (-yml)\n\n")
 		flag.Usage()
-		os.Exit(0)
+		log.Fatalf("Please specify a dashboard ID (-dashboard) or a manifest file (-yml)")
 	}
 
 	if len(*ymlFile) > 0 {
-		dashboards, err := ReadManifest(*ymlFile)
+		err = exportDashboardsFromYML(client, *ymlFile)
 		if err != nil {
-			fmt.Printf("ERROR: %s\n", err)
-			os.Exit(1)
+			log.Fatalf("Failed to export dashboards from YML file: %v", err)
 		}
-
-		for _, dashboard := range dashboards {
-			fmt.Printf("id=%s, name=%s\n", dashboard["id"], dashboard["file"])
-			directory := path.Join(path.Dir(*ymlFile), "_meta/kibana/6/dashboard")
-			err := os.MkdirAll(directory, 0755)
-			if err != nil {
-				fmt.Printf("ERROR: fail to create directory %s: %v", directory, err)
-			}
-			err = Export(client, *kibanaURL, dashboard["id"], path.Join(directory, dashboard["file"]))
-			if err != nil {
-				fmt.Printf("ERROR: fail to export the dashboards: %s\n", err)
-			}
-		}
-		os.Exit(0)
+		return
 	}
 
 	if len(*dashboard) > 0 {
-		err := Export(client, *kibanaURL, *dashboard, *fileOutput)
+		err = exportSingleDashboard(client, *dashboard, *fileOutput)
 		if err != nil {
-			fmt.Printf("ERROR: fail to export the dashboards: %s\n", err)
+			log.Fatalf("Failed to export the dashboard: %v", err)
+		}
+		if !quiet {
+			log.Printf("The dashboard %s was exported under '%s'\n", *dashboard, *fileOutput)
+		}
+		return
+	}
+}
+
+func exportDashboardsFromYML(client *kibana.Client, ymlFile string) error {
+	results, info, err := dashboards.ExportAllFromYml(client, ymlFile)
+	if err != nil {
+		return err
+	}
+	for i, r := range results {
+		log.Printf("id=%s, name=%s\n", info.Dashboards[i].ID, info.Dashboards[i].File)
+		r = dashboards.DecodeExported(r)
+		err = dashboards.SaveToFile(r, info.Dashboards[i].File, filepath.Dir(ymlFile), client.GetVersion())
+		if err != nil {
+			return err
 		}
 	}
+	return nil
+}
+
+func exportSingleDashboard(client *kibana.Client, dashboard, output string) error {
+	result, err := dashboards.Export(client, dashboard)
+	if err != nil {
+		return fmt.Errorf("failed to export the dashboard: %+v", err)
+	}
+	result = dashboards.DecodeExported(result)
+	err = ioutil.WriteFile(output, []byte(result.StringToPrint()), dashboards.OutputPermission)
+	if err != nil {
+		return fmt.Errorf("failed to save the dashboards: %+v", err)
+	}
+	return nil
 }

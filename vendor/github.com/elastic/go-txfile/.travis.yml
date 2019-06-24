@@ -3,33 +3,74 @@ language: go
 os:
   - linux
   - osx
+  - windows
 
 go:
-  - '1.9'
   - '1.10'
+  - '1.11'
   - 'tip'
+
+matrix:
+  exclude:
+  - os: 'windows'
+    go: 'tip'
 
 env:
   global:
-    - GO_CROSS_VERSION='1.10'
+    - GO_CROSS_VERSION='1.11'
     - GO_CHECK_CROSS_SCRIPT='GOOS=$TARGET go build ./...'
+jobs:
+  include:
+    # try to cross compile to untested OSes
+    - name: XBuild OpenBSD
+      env: TARGET=openbsd
+      go: $GO_CROSS_VERSION
+      script: eval $GO_CHECK_CROSS_SCRIPT
+    - name: XBuild NetBSD
+      env: TARGET=netbsd
+      go: $GO_CROSS_VERSION
+      script: eval $GO_CHECK_CROSS_SCRIPT
+    - name: XBuild FreeBSD
+      env: TARGET=freebsd
+      go: $GO_CROSS_VERSION
+      script: eval $GO_CHECK_CROSS_SCRIPT
+
+    - name: 32Bit ARM go1.10
+      env: [BUILD_OS=linux, BUILD_ARCH=arm]
+      go: '1.10'
+      services: [docker]
+      before_install:
+        - docker run --rm --privileged multiarch/qemu-user-static:register --reset
+        - |
+          go get -u -d github.com/magefile/mage
+          (cd $GOPATH/src/github.com/magefile/mage; go run bootstrap.go)
+      script:
+        - mage -v test
+
+    - name: 32Bit ARM go1.11
+      env: [BUILD_OS=linux, BUILD_ARCH=arm]
+      go: '1.11'
+      services: [docker]
+      before_install:
+        - docker run --rm --privileged multiarch/qemu-user-static:register --reset
+        - |
+          go get -u -d github.com/magefile/mage
+          (cd $GOPATH/src/github.com/magefile/mage; go run bootstrap.go)
+      script:
+        - mage -v test
 
 # Check we're testing the correct commit (Snippet from: https://github.com/travis-ci/travis-ci/issues/7459#issuecomment-287040521)
 before_install:
   - |
     if [[ "$TRAVIS_COMMIT" != "$(git rev-parse HEAD)" ]]; then
       echo "Commit $(git rev-parse HEAD) doesn't match expected commit $TRAVIS_COMMIT"
+      exit 1
     fi
+  - |
+    # install mage
+    go get -u -d github.com/magefile/mage
+    (cd $GOPATH/src/github.com/magefile/mage; go run bootstrap.go)
 
-jobs:
-  include:
-    # try to cross compile to untested OSes
-    - env: TARGET=openbsd
-      go: $GO_CROSS_VERSION
-      script: eval $GO_CHECK_CROSS_SCRIPT
-    - env: TARGET=netbsd
-      go: $GO_CROSS_VERSION
-      script: eval $GO_CHECK_CROSS_SCRIPT
-    - env: TARGET=freebsd
-      go: $GO_CROSS_VERSION
-      script: eval $GO_CHECK_CROSS_SCRIPT
+script:
+- go env
+- mage -v test

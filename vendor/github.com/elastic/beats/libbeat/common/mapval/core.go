@@ -18,6 +18,7 @@
 package mapval
 
 import (
+	"reflect"
 	"sort"
 	"strings"
 
@@ -36,24 +37,29 @@ func Optional(id IsDef) IsDef {
 	return id
 }
 
-// Map is the type used to define schema definitions for Schema.
+// Map is the type used to define schema definitions for Compile and to represent an arbitrary
+// map of values of any type.
 type Map map[string]interface{}
 
-// Validator is the result of Schema and is run against the map you'd like to test.
-type Validator func(common.MapStr) Results
+// Slice is a convenience []interface{} used to declare schema defs. You would typically nest this inside
+// a Map as a value, and it would be able to match against any type of non-empty slice.
+type Slice []interface{}
+
+// Validator is the result of Compile and is run against the map you'd like to test.
+type Validator func(common.MapStr) *Results
 
 // Compose combines multiple SchemaValidators into a single one.
 func Compose(validators ...Validator) Validator {
-	return func(actual common.MapStr) Results {
-		results := make([]Results, len(validators))
+	return func(actual common.MapStr) *Results {
+		results := make([]*Results, len(validators))
 		for idx, validator := range validators {
 			results[idx] = validator(actual)
 		}
 
-		combined := Results{}
+		combined := NewResults()
 		for _, r := range results {
-			r.EachResult(func(path string, vr ValueResult) bool {
-				combined.recordResult(path, vr)
+			r.EachResult(func(path path, vr ValueResult) bool {
+				combined.record(path, vr)
 				return true
 			})
 		}
@@ -63,8 +69,8 @@ func Compose(validators ...Validator) Validator {
 
 // Strict is used when you want any unspecified keys that are encountered to be considered errors.
 func Strict(laxValidator Validator) Validator {
-	return func(actual common.MapStr) Results {
-		validatedResults := laxValidator(actual)
+	return func(actual common.MapStr) *Results {
+		results := laxValidator(actual)
 
 		// The inner workings of this are a little weird
 		// We use a hash of dotted paths to track the results
@@ -78,66 +84,68 @@ func Strict(laxValidator Validator) Validator {
 		// It's a little weird, but is fairly efficient. We could stop using the flattened map as a datastructure, but
 		// that would add complexity elsewhere. Probably a good refactor at some point, but not worth it now.
 		validatedPaths := []string{}
-		for k := range validatedResults {
+		for k := range results.Fields {
 			validatedPaths = append(validatedPaths, k)
 		}
 		sort.Strings(validatedPaths)
 
-		walk(actual, func(woi walkObserverInfo) {
-			_, validatedExactly := validatedResults[woi.dottedPath]
+		walk(actual, false, func(woi walkObserverInfo) error {
+			_, validatedExactly := results.Fields[woi.path.String()]
 			if validatedExactly {
-				return // This key was tested, passes strict test
+				return nil // This key was tested, passes strict test
 			}
 
 			// Search returns the point just before an actual match (since we ruled out an exact match with the cheaper
 			// hash check above. We have to validate the actual match with a prefix check as well
-			matchIdx := sort.SearchStrings(validatedPaths, woi.dottedPath)
-			if matchIdx < len(validatedPaths) && strings.HasPrefix(validatedPaths[matchIdx], woi.dottedPath) {
-				return
+			matchIdx := sort.SearchStrings(validatedPaths, woi.path.String())
+			if matchIdx < len(validatedPaths) && strings.HasPrefix(validatedPaths[matchIdx], woi.path.String()) {
+				return nil
 			}
 
-			validatedResults.recordResult(woi.dottedPath, StrictFailureVR)
+			results.merge(StrictFailureResult(woi.path))
+
+			return nil
 		})
 
-		return validatedResults
+		return results
 	}
 }
 
-// Schema takes a Map and returns an executable Validator function.
-func Schema(expected Map) Validator {
-	return func(actual common.MapStr) Results {
-		return walkValidate(expected, actual)
-	}
-}
+// Compile takes the given map, validates the paths within it, and returns
+// a Validator that can check real data.
+func Compile(in Map) (validator Validator, err error) {
+	compiled := make(CompiledSchema, 0)
+	err = walk(common.MapStr(in), true, func(current walkObserverInfo) error {
 
-func walkValidate(expected Map, actual common.MapStr) (results Results) {
-	results = Results{}
-	walk(
-		common.MapStr(expected),
-		func(expInfo walkObserverInfo) {
+		// Determine whether we should test this value
+		// We want to test all values except collections that contain a value
+		// If a collection contains a value, we check those 'leaf' values instead
+		rv := reflect.ValueOf(current.value)
+		kind := rv.Kind()
+		isCollection := kind == reflect.Map || kind == reflect.Slice
+		isNonEmptyCollection := isCollection && rv.Len() > 0
 
-			actualKeyExists, _ := actual.HasKey(expInfo.dottedPath)
-			actualV, _ := actual.GetValue(expInfo.dottedPath)
-
-			// If this is a definition use it, if not, check exact equality
-			isDef, isIsDef := expInfo.value.(IsDef)
+		if !isNonEmptyCollection {
+			isDef, isIsDef := current.value.(IsDef)
 			if !isIsDef {
-				// We don't check maps for equality, we check their properties
-				// individual via our own traversal, so bail early
-				if _, isMS := actualV.(common.MapStr); isMS {
-					return
-				}
-
-				isDef = IsEqual(expInfo.value)
+				isDef = IsEqual(current.value)
 			}
 
-			if !isDef.optional || isDef.optional && actualKeyExists {
-				results.recordResult(
-					expInfo.dottedPath,
-					isDef.check(actualV, actualKeyExists),
-				)
-			}
-		})
+			compiled = append(compiled, flatValidator{current.path, isDef})
+		}
+		return nil
+	})
 
-	return results
+	return func(actual common.MapStr) *Results {
+		return compiled.Check(actual)
+	}, err
+}
+
+// MustCompile compiles the given map, panic-ing if that map is invalid.
+func MustCompile(in Map) Validator {
+	compiled, err := Compile(in)
+	if err != nil {
+		panic(err)
+	}
+	return compiled
 }

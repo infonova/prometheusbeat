@@ -51,9 +51,6 @@ Example Prometheusbeat event:
 }
 ```
 
-Ensure that this folder is at the following location:
-`${GOPATH}/github.com/infonova/prometheusbeat`
-
 ## Getting Started with Prometheusbeat
 
 ### Requirements
@@ -85,7 +82,7 @@ To build the binary for Prometheusbeat run the command below. This will generate
 in the same directory with the name prometheusbeat.
 
 ```
-make
+mage build
 ```
 
 
@@ -129,11 +126,10 @@ make update
 
 ### Cleanup
 
-To clean  Prometheusbeat source code, run the following commands:
+To clean  Prometheusbeat source code, run the following command:
 
 ```
 make fmt
-make simplify
 ```
 
 To clean up the build directory and generated artifacts, run:
@@ -155,19 +151,15 @@ git clone https://github.com/infonova/prometheusbeat
 
 For further development, check out the [beat developer guide](https://www.elastic.co/guide/en/beats/libbeat/current/new-beat.html).
 
+## Packaging
 
-## Releasing
-
-The beat framework provides tools to crosscompile and package your beat for different platforms. This requires [docker](https://www.docker.com/) and vendoring as described above. Note that as long as [dep#1306](https://github.com/golang/dep/issues/1306) is not fixed you have to perform `make copy-vendor` before creating a release.
-
-To build packages of your beat, run the following command:
+The beat frameworks provides tools to crosscompile and package your beat for different platforms. This requires [docker](https://www.docker.com/) and vendoring as described above. To build packages of your beat, run the following command:
 
 ```
 make release
 ```
 
 This will fetch and create all images required for the build process. The whole process to finish can take several minutes.
-
 
 ## Building Docker Image
 

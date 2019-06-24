@@ -21,19 +21,25 @@ import (
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/feature"
+	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/libbeat/paths"
 	"github.com/elastic/beats/libbeat/publisher/queue"
 	"github.com/elastic/go-txfile"
 )
 
 // Feature exposes a spooling to disk queue.
-var Feature = queue.Feature("spool", create, feature.Beta)
+var Feature = queue.Feature("spool", create,
+	feature.NewDetails(
+		"Memory queue",
+		"Buffer events in memory before sending to the output.",
+		feature.Beta),
+)
 
 func init() {
 	queue.RegisterType("spool", create)
 }
 
-func create(eventer queue.Eventer, cfg *common.Config) (queue.Queue, error) {
+func create(eventer queue.Eventer, logp *logp.Logger, cfg *common.Config) (queue.Queue, error) {
 	cfgwarn.Beta("Spooling to disk is beta")
 
 	config := defaultConfig()
@@ -51,7 +57,12 @@ func create(eventer queue.Eventer, cfg *common.Config) (queue.Queue, error) {
 		flushEvents = uint(count)
 	}
 
-	return NewSpool(defaultLogger(), path, Settings{
+	var log logger = logp
+	if logp == nil {
+		log = defaultLogger()
+	}
+
+	return NewSpool(log, path, Settings{
 		Eventer:           eventer,
 		Mode:              config.File.Permissions,
 		WriteBuffer:       uint(config.Write.BufferSize),

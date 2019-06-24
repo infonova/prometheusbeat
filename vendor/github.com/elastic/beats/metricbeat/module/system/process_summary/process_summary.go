@@ -59,10 +59,11 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 // Fetch methods implements the data gathering and data conversion to the right format
 // It returns the event which is then forward to the output. In case of an error, a
 // descriptive error must be returned.
-func (m *MetricSet) Fetch() (common.MapStr, error) {
+func (m *MetricSet) Fetch(r mb.ReporterV2) {
 	pids, err := process.Pids()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch the list of PIDs")
+		r.Error(errors.Wrap(err, "failed to fetch the list of PIDs"))
+		return
 	}
 
 	var summary struct {
@@ -72,6 +73,7 @@ func (m *MetricSet) Fetch() (common.MapStr, error) {
 		stopped  int
 		zombie   int
 		unknown  int
+		dead     int
 	}
 
 	for _, pid := range pids {
@@ -95,8 +97,10 @@ func (m *MetricSet) Fetch() (common.MapStr, error) {
 			summary.stopped++
 		case 'Z':
 			summary.zombie++
+		case 'X':
+			summary.dead++
 		default:
-			logp.Err("Unknown state <%v> for process with pid %d", state.State, pid)
+			logp.Err("Unknown or unexpected state <%c> for process with pid %d", state.State, pid)
 			summary.unknown++
 		}
 	}
@@ -109,9 +113,12 @@ func (m *MetricSet) Fetch() (common.MapStr, error) {
 		"stopped":  summary.stopped,
 		"zombie":   summary.zombie,
 		"unknown":  summary.unknown,
+		"dead":     summary.dead,
 	}
-	// change the name space to use . instead of _
-	event[mb.NamespaceKey] = "process.summary"
 
-	return event, nil
+	r.Event(mb.Event{
+		// change the name space to use . instead of _
+		Namespace:       "system.process.summary",
+		MetricSetFields: event,
+	})
 }

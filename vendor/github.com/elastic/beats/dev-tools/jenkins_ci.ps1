@@ -1,14 +1,20 @@
-function Exec
-{
+function Exec {
+    [CmdletBinding()]
     param(
-        [Parameter(Position=0,Mandatory=1)][scriptblock]$cmd,
-        [Parameter(Position=1,Mandatory=0)][string]$errorMessage = ($msgs.error_bad_command -f $cmd)
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$cmd,
+        [string]$errorMessage = ($msgs.error_bad_command -f $cmd)
     )
 
-    & $cmd
-    if ($LastExitCode -ne 0) {
-        Write-Error $errorMessage
-        exit $LastExitCode
+    try {
+        $global:lastexitcode = 0
+        & $cmd
+        if ($lastexitcode -ne 0) {
+            throw $errorMessage
+        }
+    }
+    catch [Exception] {
+        throw $_
     }
 }
 
@@ -21,20 +27,19 @@ $env:PATH = "$env:GOPATH\bin;C:\tools\mingw64\bin;$env:PATH"
 # each run starts from a clean slate.
 $env:MAGEFILE_CACHE = "$env:WORKSPACE\.magefile"
 
-exec { go install github.com/elastic/beats/vendor/github.com/magefile/mage }
-exec { go get -u github.com/jstemmer/go-junit-report }
+# Configure testing parameters.
+$env:TEST_COVERAGE = "true"
+$env:RACE_DETECTOR = "true"
 
-echo "Building libbeat fields.yml"
-cd libbeat
-exec { mage fields }
-cd ..
+# Install mage from vendor.
+exec { go install github.com/elastic/beats/vendor/github.com/magefile/mage } "mage install FAILURE"
 
-if (Test-Path "$env:beat") {
+if (Test-Path "$env:beat\magefile.go") {
     cd "$env:beat"
 } else {
-    echo "$env:beat does not exist"
+    echo "$env:beat\magefile.go does not exist"
     New-Item -ItemType directory -Path build | Out-Null
-    New-Item -Name build\TEST-empty.xml -ItemType File | Out-Null
+    New-Item -Name build\TEST-empty.out -ItemType File | Out-Null
     exit
 }
 
@@ -44,21 +49,21 @@ New-Item -ItemType directory -Path build\system-tests | Out-Null
 New-Item -ItemType directory -Path build\system-tests\run | Out-Null
 
 echo "Building fields.yml"
-exec { mage fields }
+exec { mage fields } "mage fields FAILURE"
 
 echo "Building $env:beat"
 exec { mage build } "Build FAILURE"
 
 echo "Unit testing $env:beat"
-go test -v $(go list ./... | select-string -Pattern "vendor" -NotMatch) 2>&1 | Out-File -encoding UTF8 build/TEST-go-unit.out
-exec { Get-Content build/TEST-go-unit.out | go-junit-report.exe -set-exit-code | Out-File -encoding UTF8 build/TEST-go-unit.xml } "Unit test FAILURE"
+exec { mage goTestUnit } "mage goTestUnit FAILURE"
 
 echo "System testing $env:beat"
-# TODO (elastic/beats#5050): Use a vendored copy of this.
-exec { go get github.com/docker/libcompose }
 # Get a CSV list of package names.
 $packages = $(go list ./... | select-string -Pattern "/vendor/" -NotMatch | select-string -Pattern "/scripts/cmd/" -NotMatch)
 $packages = ($packages|group|Select -ExpandProperty Name) -join ","
-exec { go test -race -c -cover -covermode=atomic -coverpkg $packages }
-exec { cd tests/system }
-exec { nosetests --with-timer --with-xunit --xunit-file=../../build/TEST-system.xml } "System test FAILURE"
+exec { go test -race -c -cover -covermode=atomic -coverpkg $packages } "go test -race -cover FAILURE"
+
+if (Test-Path "tests\system") {
+    Set-Location -Path tests\system
+    exec { nosetests --with-timer --with-xunit --xunit-file=../../build/TEST-system.xml } "System test FAILURE"
+}

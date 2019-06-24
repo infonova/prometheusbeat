@@ -1,5 +1,5 @@
 # Module: kubernetes
-# Docs: https://www.elastic.co/guide/en/beats/metricbeat/6.4/metricbeat-module-kubernetes.html
+# Docs: https://www.elastic.co/guide/en/beats/metricbeat/7.1/metricbeat-module-kubernetes.html
 
 # Node metrics, from kubelet:
 - module: kubernetes
@@ -20,6 +20,8 @@
   # Enriching parameters:
   #add_metadata: true
   #in_cluster: true
+  #labels.dedot: true
+  #annotations.dedot: true
   # When used outside the cluster:
   #in_cluster: false
   #host: node_name

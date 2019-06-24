@@ -83,10 +83,14 @@ jenkins_setup() {
   : "${HOME:?Need to set HOME to a non-empty value.}"
   : "${WORKSPACE:?Need to set WORKSPACE to a non-empty value.}"
 
+  if [ -z ${GO_VERSION:-} ]; then
+    get_go_version
+  fi
+
   # Setup Go.
   export GOPATH=${WORKSPACE}
   export PATH=${GOPATH}/bin:${PATH}
-  eval "$(gvm $(cat .go-version))"
+  eval "$(gvm ${GO_VERSION})"
 
   # Workaround for Python virtualenv path being too long.
   export TEMP_PYTHON_ENV=$(mktemp -d)
@@ -95,4 +99,15 @@ jenkins_setup() {
   # Write cached magefile binaries to workspace to ensure
   # each run starts from a clean slate.
   export MAGEFILE_CACHE="${WORKSPACE}/.magefile"
+}
+
+docker_setup() {
+  OS="$(uname)"
+  case $OS in
+    'Darwin')
+      # Start the docker machine VM (ignore error if it's already running).
+      docker-machine start default || true
+      eval $(docker-machine env default)
+      ;;
+  esac
 }

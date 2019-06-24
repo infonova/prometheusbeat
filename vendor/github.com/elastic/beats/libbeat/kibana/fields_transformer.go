@@ -24,15 +24,18 @@ import (
 	"github.com/elastic/beats/libbeat/common"
 )
 
+var v640 = common.MustNewVersion("6.4.0")
+
 type fieldsTransformer struct {
 	fields                    common.Fields
 	transformedFields         []common.MapStr
 	transformedFieldFormatMap common.MapStr
 	version                   *common.Version
-	keys                      common.MapStr
+	keys                      map[string]int
+	migration                 bool
 }
 
-func newFieldsTransformer(version *common.Version, fields common.Fields) (*fieldsTransformer, error) {
+func newFieldsTransformer(version *common.Version, fields common.Fields, migration bool) (*fieldsTransformer, error) {
 	if version == nil {
 		return nil, errors.New("Version must be given")
 	}
@@ -41,7 +44,8 @@ func newFieldsTransformer(version *common.Version, fields common.Fields) (*field
 		version:                   version,
 		transformedFields:         []common.MapStr{},
 		transformedFieldFormatMap: common.MapStr{},
-		keys: common.MapStr{},
+		keys:                      map[string]int{},
+		migration:                 migration,
 	}, nil
 }
 
@@ -79,17 +83,28 @@ func (t *fieldsTransformer) transformFields(commonFields common.Fields, path str
 			f.Path = path + "." + f.Name
 		}
 
-		if t.keys[f.Path] != nil {
-			msg := fmt.Sprintf("ERROR: Field <%s> is duplicated. Please update and try again.", f.Path)
-			panic(errors.New(msg))
-		}
-
 		if f.Type == "group" {
 			if f.Enabled == nil || *f.Enabled {
 				t.transformFields(f.Fields, f.Path)
 			}
 		} else {
-			t.keys[f.Path] = true
+			if f.Type == "alias" {
+				if t.version.LessThan(v640) {
+					continue
+				}
+				// Only adds migration aliases if migration is enabled
+				if f.MigrationAlias && !t.migration {
+					continue
+				}
+				if ff := t.fields.GetField(f.AliasPath); ff != nil {
+					// copy the field, keep
+					path := f.Path
+					name := f.Name
+					f = *ff
+					f.Path = path
+					f.Name = name
+				}
+			}
 			t.add(f)
 
 			if f.MultiFields != nil {
@@ -104,13 +119,35 @@ func (t *fieldsTransformer) transformFields(commonFields common.Fields, path str
 	}
 }
 
+func (t *fieldsTransformer) update(target *common.MapStr, override common.Field) error {
+	field, _ := transformField(t.version, override)
+	if override.Type == "" || (*target)["type"] == field["type"] {
+		target.Update(field)
+		if !override.Overwrite {
+			// compatible duplication
+			return fmt.Errorf("field <%s> is duplicated, remove it or set 'overwrite: true', %+v, %+v", override.Path, override, field)
+		}
+		return nil
+	}
+	// incompatible duplication
+	return fmt.Errorf("field <%s> is duplicated", override.Path)
+}
+
 func (t *fieldsTransformer) add(f common.Field) {
+	if idx := t.keys[f.Path]; idx > 0 {
+		target := &t.transformedFields[idx-1] // 1-indexed
+		if err := t.update(target, f); err != nil {
+			panic(err)
+		}
+		return
+	}
+
 	field, fieldFormat := transformField(t.version, f)
 	t.transformedFields = append(t.transformedFields, field)
+	t.keys[f.Path] = len(t.transformedFields) // 1-index
 	if fieldFormat != nil {
 		t.transformedFieldFormatMap[field["name"].(string)] = fieldFormat
 	}
-
 }
 
 func transformField(version *common.Version, f common.Field) (common.MapStr, common.MapStr) {
@@ -135,6 +172,18 @@ func transformField(version *common.Version, f common.Field) (common.MapStr, com
 		field["doc_values"] = getVal(f.DocValues, false)
 		field["indexed"] = false
 		field["searchable"] = false
+	}
+
+	if f.Type == "object" && f.Enabled != nil {
+		enabled := getVal(f.Enabled, true)
+		field["enabled"] = enabled
+		if !enabled {
+			field["aggregatable"] = false
+			field["analyzed"] = false
+			field["doc_values"] = false
+			field["indexed"] = false
+			field["searchable"] = false
+		}
 	}
 
 	if f.Type == "text" {
@@ -242,5 +291,7 @@ var (
 		"":             "string",
 		"geo_point":    "geo_point",
 		"date":         "date",
+		"ip":           "ip",
+		"boolean":      "boolean",
 	}
 )
