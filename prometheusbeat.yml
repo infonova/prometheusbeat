@@ -8,9 +8,6 @@ prometheusbeat:
   # Context path. Defaults to /prometheus
   context: "/prometheus"
 
-  # If this setting is set to true the metric name field is stored as a top-level field. Defaults to false
-  # name_under_root: false
-
 #================================ General =====================================
 
 # The name of the shipper that publishes the network data. It can be used to group

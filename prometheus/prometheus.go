@@ -55,6 +55,18 @@ func (promSrv *PrometheusServer) Start(events chan common.MapStr) {
 	log.Fatal(http.ListenAndServe(promSrv.config.Listen, nil))
 }
 
+func removeSpecialCharacters(input string, characters string) string {
+	filter := func(r rune) rune {
+		if strings.IndexRune(characters, r) < 0 {
+			return r
+		}
+		return -1
+	}
+
+	trimmedInput := strings.TrimLeft(input, "_")
+	return strings.Map(filter, trimmedInput)
+}
+
 func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http.Request) {
 
 	v := r.Header.Get("X-Prometheus-Remote-Write-Version")
@@ -102,10 +114,12 @@ func (promSrv *PrometheusServer) handlePrometheus(w http.ResponseWriter, r *http
 		event := map[string]interface{}{}
 		labels := map[string]interface{}{}
 		for _, l := range ts.Labels {
-			fieldName := strings.Trim(l.Name, "_")
-			if fieldName == "name" && promSrv.config.NameUnderRoot {
-				event[fieldName] = l.Value
+			// Move timeseries name to root level
+			if l.Name == "__name__" {
+				event["name"] = l.Value
 			} else {
+				// Remove special characters
+				fieldName := removeSpecialCharacters(l.Name, ", ")
 				labels[fieldName] = l.Value
 			}
 		}
