@@ -34,16 +34,6 @@ type publishClient struct {
 	params map[string]string
 }
 
-var (
-	// monitoring beats action
-	actMonitoringBeats = common.MapStr{
-		"index": common.MapStr{
-			"_index":   "",
-			"_routing": nil,
-		},
-	}
-)
-
 func newPublishClient(
 	es *esout.Client,
 	params map[string]string,
@@ -122,10 +112,14 @@ func (c *publishClient) Publish(batch publisher.Batch) error {
 				}
 			}
 		}
-		actMonitoringBeats.Put("index._type", t)
 
+		meta := common.MapStr{
+			"_index":   "",
+			"_routing": nil,
+			"_type":    t,
+		}
 		bulk := [2]interface{}{
-			actMonitoringBeats,
+			common.MapStr{"index": meta},
 			report.Event{
 				Timestamp: event.Content.Timestamp,
 				Fields:    event.Content.Fields,
@@ -134,7 +128,8 @@ func (c *publishClient) Publish(batch publisher.Batch) error {
 
 		// Currently one request per event is sent. Reason is that each event can contain different
 		// interval params and X-Pack requires to send the interval param.
-		_, err = c.es.BulkWith("_xpack", "monitoring", params, nil, bulk[:])
+		_, err = c.es.SendMonitoringBulk(params, bulk[:])
+
 		if err != nil {
 			failed = append(failed, event)
 			reason = err

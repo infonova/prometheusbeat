@@ -18,7 +18,9 @@
 package pipeline
 
 import (
-	"github.com/elastic/beats/libbeat/logp"
+	"github.com/elastic/beats/libbeat/beat"
+	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/common/reload"
 	"github.com/elastic/beats/libbeat/outputs"
 	"github.com/elastic/beats/libbeat/publisher/queue"
 )
@@ -28,7 +30,8 @@ import (
 // - stop
 // - reload
 type outputController struct {
-	logger   *logp.Logger
+	beat     beat.Info
+	monitors Monitors
 	observer outputObserver
 
 	queue queue.Queue
@@ -56,19 +59,21 @@ type outputWorker interface {
 }
 
 func newOutputController(
-	log *logp.Logger,
+	beat beat.Info,
+	monitors Monitors,
 	observer outputObserver,
 	b queue.Queue,
 ) *outputController {
 	c := &outputController{
-		logger:   log,
+		beat:     beat,
+		monitors: monitors,
 		observer: observer,
 		queue:    b,
 	}
 
 	ctx := &batchContext{}
-	c.consumer = newEventConsumer(log, b, ctx)
-	c.retryer = newRetryer(log, observer, nil, c.consumer)
+	c.consumer = newEventConsumer(monitors.Logger, b, ctx)
+	c.retryer = newRetryer(monitors.Logger, observer, nil, c.consumer)
 	ctx.observer = observer
 	ctx.retryer = c.retryer
 
@@ -128,6 +133,8 @@ func (c *outputController) Set(outGrp outputs.Group) {
 		}
 	}
 
+	c.out = grp
+
 	// restart consumer (potentially blocked by retryer)
 	c.consumer.sigContinue()
 
@@ -136,4 +143,30 @@ func (c *outputController) Set(outGrp outputs.Group) {
 
 func makeWorkQueue() workQueue {
 	return workQueue(make(chan *Batch, 0))
+}
+
+// Reload the output
+func (c *outputController) Reload(
+	cfg *reload.ConfigWithMeta,
+	outFactory func(outputs.Observer, common.ConfigNamespace) (outputs.Group, error),
+) error {
+	outCfg := common.ConfigNamespace{}
+	if cfg != nil {
+		if err := cfg.Config.Unpack(&outCfg); err != nil {
+			return err
+		}
+	}
+
+	output, err := loadOutput(c.monitors, func(stats outputs.Observer) (string, outputs.Group, error) {
+		name := outCfg.Name()
+		out, err := outFactory(stats, outCfg)
+		return name, out, err
+	})
+	if err != nil {
+		return err
+	}
+
+	c.Set(output)
+
+	return nil
 }

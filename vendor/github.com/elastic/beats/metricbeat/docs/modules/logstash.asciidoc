@@ -5,11 +5,14 @@ This file is generated! See scripts/docs_collector.py
 [[metricbeat-module-logstash]]
 == Logstash module
 
-beta[]
-
 This is the Logstash module.
 
 The default metricsets are `node` and `node_stats`.
+
+[float]
+=== Compability
+
+The logstash module is tested with logstash 6.3.
 
 
 [float]
@@ -28,7 +31,8 @@ metricbeat.modules:
   hosts: ["localhost:9600"]
 ----
 
-This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>. It also supports the options described in <<module-http-config-options>>.
+This module supports TLS connections when using `ssl` config field, as described in <<configuration-ssl>>.
+It also supports the options described in <<module-http-config-options>>.
 
 [float]
 === Metricsets

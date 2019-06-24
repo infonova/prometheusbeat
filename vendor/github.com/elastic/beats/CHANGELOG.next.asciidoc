@@ -1,0 +1,120 @@
+// Use these for links to issue and pulls. Note issues and pulls redirect one to
+// each other on Github, so don't worry too much on using the right prefix.
+:issue: https://github.com/elastic/beats/issues/
+:pull: https://github.com/elastic/beats/pull/
+
+=== Beats version HEAD
+https://github.com/elastic/beats/compare/v7.0.0...7.1[Check the HEAD diff]
+
+==== Breaking changes
+
+*Affecting all Beats*
+
+*Auditbeat*
+
+*Filebeat*
+
+*Heartbeat*
+
+*Journalbeat*
+
+*Metricbeat*
+
+*Packetbeat*
+
+*Winlogbeat*
+
+*Functionbeat*
+
+==== Bugfixes
+
+*Affecting all Beats*
+
+- Fixed a memory leak when using the add_process_metadata processor under Windows. {pull}12100[12100]
+
+*Auditbeat*
+
+- Package dataset: Log error when Homebrew is not installed. {pull}11667[11667]
+- Process dataset: Fixed a memory leak under Windows. {pull}12100[12100]
+- Login dataset: Fix re-read of utmp files. {pull}12028[12028]
+- Package dataset: Fixed a crash inside librpm after Auditbeat has been running for a while. {issue}12147[12147] {pull}12168[12168]
+
+*Filebeat*
+
+- Fix goroutine leak caused on initialization failures of log input. {pull}12125[12125]
+- Fix memory leak in Filebeat pipeline acker. {pull}12063[12063]
+- Fix goroutine leak on non-explicit finalization of log input. {pull}12164[12164]
+
+*Heartbeat*
+
+*Journalbeat*
+
+*Metricbeat*
+
+- Update documentation with cloudwatch:ListMetrics permission. {pull}11987[11987]
+- Change some field type from scaled_float to long in aws module. {pull}11982[11982]
+
+*Packetbeat*
+
+- Fixed a memory leak when using process monitoring under Windows. {pull}12100[12100]
+
+*Winlogbeat*
+
+*Functionbeat*
+
+==== Added
+
+*Affecting all Beats*
+
+*Auditbeat*
+
+*Filebeat*
+
+*Heartbeat*
+
+*Journalbeat*
+
+*Metricbeat*
+
+*Packetbeat*
+
+*Functionbeat*
+
+==== Deprecated
+
+*Affecting all Beats*
+
+*Filebeat*
+
+*Heartbeat*
+
+*Journalbeat*
+
+*Metricbeat*
+
+*Packetbeat*
+
+*Winlogbeat*
+
+*Functionbeat*
+
+==== Known Issue
+
+*Affecting all Beats*
+
+*Filebeat*
+
+*Heartbeat*
+
+*Journalbeat*
+
+*Metricbeat*
+
+*Packetbeat*
+
+*Winlogbeat*
+
+*Functionbeat*
+
+*Journalbeat*
+

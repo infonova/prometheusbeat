@@ -66,7 +66,7 @@ in <<configuration-metricbeat>>. Here is an example configuration:
 ----
 metricbeat.modules:
 - module: mongodb
-  metricsets: ["dbstats", "status"]
+  metricsets: ["dbstats", "status", "collstats", "metrics", "replstatus"]
   period: 10s
   enabled: true
 
@@ -99,7 +99,7 @@ metricbeat.modules:
   #password: pass
 ----
 
-This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>. It also supports the options described in <<module-http-config-options>>.
+This module supports TLS connections when using `ssl` config field, as described in <<configuration-ssl>>.
 
 [float]
 === Metricsets
@@ -110,11 +110,19 @@ The following metricsets are available:
 
 * <<metricbeat-metricset-mongodb-dbstats,dbstats>>
 
+* <<metricbeat-metricset-mongodb-metrics,metrics>>
+
+* <<metricbeat-metricset-mongodb-replstatus,replstatus>>
+
 * <<metricbeat-metricset-mongodb-status,status>>
 
 include::mongodb/collstats.asciidoc[]
 
 include::mongodb/dbstats.asciidoc[]
+
+include::mongodb/metrics.asciidoc[]
+
+include::mongodb/replstatus.asciidoc[]
 
 include::mongodb/status.asciidoc[]
 

@@ -24,19 +24,15 @@ import (
 // Namespace is the feature namespace for queue definition.
 var Namespace = "libbeat.queue"
 
-// Global queue type registry for configuring and loading a queue instance
-// via common.Config
-var queueReg = map[string]Factory{}
-
 // RegisterType registers a new queue type.
 func RegisterType(name string, fn Factory) {
-	f := feature.New(Namespace, name, fn, feature.Undefined)
+	f := Feature(name, fn, feature.NewDetails(name, "", feature.Undefined))
 	feature.MustRegister(f)
 }
 
 // FindFactory retrieves a queue types constructor. Returns nil if queue type is unknown
 func FindFactory(name string) Factory {
-	f, err := feature.Registry.Lookup(Namespace, name)
+	f, err := feature.GlobalRegistry().Lookup(Namespace, name)
 	if err != nil {
 		return nil
 	}
@@ -49,6 +45,6 @@ func FindFactory(name string) Factory {
 }
 
 // Feature creates a new type of queue.
-func Feature(name string, factory Factory, stability feature.Stability) *feature.Feature {
-	return feature.New(Namespace, name, factory, stability)
+func Feature(name string, factory Factory, description feature.Describer) *feature.Feature {
+	return feature.New(Namespace, name, factory, description)
 }

@@ -28,7 +28,13 @@ import (
 )
 
 // Feature exposes a memory queue.
-var Feature = queue.Feature("mem", create, feature.Stable)
+var Feature = queue.Feature("mem",
+	create,
+	feature.NewDetails(
+		"Memory queue",
+		"Buffer events in memory before sending to the output.",
+		feature.Stable),
+)
 
 type Broker struct {
 	done chan struct{}
@@ -81,13 +87,17 @@ func init() {
 	queue.RegisterType("mem", create)
 }
 
-func create(eventer queue.Eventer, cfg *common.Config) (queue.Queue, error) {
+func create(eventer queue.Eventer, logger *logp.Logger, cfg *common.Config) (queue.Queue, error) {
 	config := defaultConfig
 	if err := cfg.Unpack(&config); err != nil {
 		return nil, err
 	}
 
-	return NewBroker(Settings{
+	if logger == nil {
+		logger = logp.L()
+	}
+
+	return NewBroker(logger, Settings{
 		Eventer:        eventer,
 		Events:         config.Events,
 		FlushMinEvents: config.FlushMinEvents,
@@ -99,6 +109,7 @@ func create(eventer queue.Eventer, cfg *common.Config) (queue.Queue, error) {
 // If waitOnClose is set to true, the broker will block on Close, until all internal
 // workers handling incoming messages and ACKs have been shut down.
 func NewBroker(
+	logger logger,
 	settings Settings,
 ) *Broker {
 	// define internal channel size for producer/client requests
@@ -122,9 +133,13 @@ func NewBroker(
 		minEvents = sz
 	}
 
+	if logger == nil {
+		logger = logp.NewLogger("memqueue")
+	}
+
 	b := &Broker{
 		done:   make(chan struct{}),
-		logger: logp.NewLogger("memqueue"),
+		logger: logger,
 
 		// broker API channels
 		events:    make(chan pushRequest, chanSize),

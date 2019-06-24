@@ -5,8 +5,6 @@ This file is generated! See scripts/docs_collector.py
 [[metricbeat-module-golang]]
 == Golang module
 
-beta[]
-
 The golang module collects metrics by submitting HTTP GET requests to https://golang.org/pkg/expvar/[golang-expvar-api].
 
 
@@ -31,7 +29,8 @@ metricbeat.modules:
     path: "/debug/vars"
 ----
 
-This module supports TLS connection when using `ssl` config field, as described in <<configuration-ssl>>. It also supports the options described in <<module-http-config-options>>.
+This module supports TLS connections when using `ssl` config field, as described in <<configuration-ssl>>.
+It also supports the options described in <<module-http-config-options>>.
 
 [float]
 === Metricsets

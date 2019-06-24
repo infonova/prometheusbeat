@@ -24,12 +24,13 @@ import (
 )
 
 func init() {
-	if err := asset.SetFields("metricbeat", "dropwizard", Asset); err != nil {
+	if err := asset.SetFields("metricbeat", "dropwizard", asset.ModuleFieldsPri, AssetDropwizard); err != nil {
 		panic(err)
 	}
 }
 
-// Asset returns asset data
-func Asset() string {
-	return "eJxsjkGqAjEQBfc5xSP7+QfoxV95A5ciEpPOGMwkId0i4+llVJQRe1nQ9WrAmWdC6LVd0831YABNmplgN29oDRBYfE9NUy2EfwMAW3Uq8DVn9soBsdcJn68/A3TO7IQJR1ZnAGHVVEYh7KxItvuFnWrXg68lppEQXRY2QEycg9BjaEBxE39lLqdzY8LY66W9yI/MtevpW3fdAwAA///TV1G0"
+// AssetDropwizard returns asset data.
+// This is the base64 encoded gzipped contents of ../metricbeat/module/dropwizard.
+func AssetDropwizard() string {
+	return "eJxsjk2KAjEQhfc5xSPr6TlAFrOaG7gUkZBUuoPpJFSVSHt6aRX/sJaveO/7BhxocYjc+imfPUcDaNZCDvb/EVoDRJLAuWtu1eHPAMBGvQpCK4WCUkTiNuPZ+jUAUyEv5DB6Awip5jqKw9aKFPsDO6l2u1t/U2Pdh1ZTHh2SL0IGSJlKFHfFDah+pg/Z9XTpK4Hbsd+TL7LvW7e9V7tLAAAA///zhlJc"
 }

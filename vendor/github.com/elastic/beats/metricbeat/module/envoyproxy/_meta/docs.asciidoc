@@ -1,5 +1,8 @@
-== envoyproxy module
-
 This is the envoyproxy module.
 
 The default metricset is `server`.
+
+[float]
+=== Compability
+
+The envoyproxy module is tested with Envoy 1.7.0.

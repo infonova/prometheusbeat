@@ -5,10 +5,9 @@ This file is generated! See scripts/docs_collector.py
 [[metricbeat-module-kvm]]
 == kvm module
 
-experimental[]
+beta[]
 
 This is the kvm module.
-
 
 
 [float]
@@ -24,7 +23,10 @@ metricbeat.modules:
   metricsets: ["dommemstat"]
   enabled: true
   period: 10s
-  hosts: ["localhost"]
+  hosts: ["unix:///var/run/libvirt/libvirt-sock"]
+  # For remote hosts, setup network access in libvirtd.conf
+  # and use the tcp scheme:
+  # hosts: [ "tcp://<host>:16509" ]
 
   # Timeout to connect to Libvirt server
   #timeout: 1s

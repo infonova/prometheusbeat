@@ -19,11 +19,14 @@ package cpu
 
 import (
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/docker"
 )
+
+var logger = logp.NewLogger("docker.cpu")
 
 func init() {
 	mb.Registry.MustAddMetricSet("docker", "cpu", New,
@@ -51,21 +54,39 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 		return nil, err
 	}
 
+	cpuConfig := struct {
+		Cores bool `config:"cpu.cores"`
+	}{
+		Cores: true,
+	}
+	if err := base.Module().UnpackConfig(&cpuConfig); err != nil {
+		return nil, err
+	}
+
 	return &MetricSet{
 		BaseMetricSet: base,
 		dockerClient:  client,
-		cpuService:    &CPUService{},
+		cpuService:    &CPUService{Cores: cpuConfig.Cores},
 		dedot:         config.DeDot,
 	}, nil
 }
 
 // Fetch returns a list of docker CPU stats.
-func (m *MetricSet) Fetch() ([]common.MapStr, error) {
+func (m *MetricSet) Fetch(r mb.ReporterV2) {
 	stats, err := docker.FetchStats(m.dockerClient, m.Module().Config().Timeout)
 	if err != nil {
-		return nil, err
+		err = errors.Wrap(err, "failed to get docker stats")
+		logger.Error(err)
+		r.Error(err)
+		return
 	}
 
 	formattedStats := m.cpuService.getCPUStatsList(stats, m.dedot)
-	return eventsMapping(formattedStats), nil
+	eventsMapping(r, formattedStats)
+}
+
+//Close stops the metricset
+func (m *MetricSet) Close() error {
+
+	return m.dockerClient.Close()
 }

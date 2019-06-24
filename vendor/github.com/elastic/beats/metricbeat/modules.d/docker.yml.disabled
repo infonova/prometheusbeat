@@ -1,11 +1,12 @@
 # Module: docker
-# Docs: https://www.elastic.co/guide/en/beats/metricbeat/6.4/metricbeat-module-docker.html
+# Docs: https://www.elastic.co/guide/en/beats/metricbeat/7.1/metricbeat-module-docker.html
 
 - module: docker
   #metricsets:
   #  - container
   #  - cpu
   #  - diskio
+  #  - event
   #  - healthcheck
   #  - info
   #  - memory

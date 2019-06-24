@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/elastic/beats/libbeat/logp"
+
+	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/metricbeat/mb"
 )
 
@@ -74,7 +77,7 @@ func (p Product) String() string {
 // MakeXPackMonitoringIndexName method returns the name of the monitoring index for
 // a given product { elasticsearch, kibana, logstash, beats }
 func MakeXPackMonitoringIndexName(product Product) string {
-	const version = "6"
+	const version = "7"
 
 	return fmt.Sprintf(".monitoring-%v-%v-mb", product.xPackMonitoringIndexString(), version)
 }
@@ -82,7 +85,24 @@ func MakeXPackMonitoringIndexName(product Product) string {
 // ReportErrorForMissingField reports and returns an error message for the given
 // field being missing in API response received from a given product
 func ReportErrorForMissingField(field string, product Product, r mb.ReporterV2) error {
-	err := fmt.Errorf("Could not find field '%v' in %v stats API response", field, strings.Title(product.String()))
+	err := MakeErrorForMissingField(field, product)
 	r.Error(err)
 	return err
+}
+
+// MakeErrorForMissingField returns an error message for the given field being missing in an API
+// response received from a given product
+func MakeErrorForMissingField(field string, product Product) error {
+	return fmt.Errorf("Could not find field '%v' in %v stats API response", field, strings.Title(product.String()))
+}
+
+// IsFeatureAvailable returns whether a feature is available in the current product version
+func IsFeatureAvailable(currentProductVersion, featureAvailableInProductVersion *common.Version) bool {
+	return !currentProductVersion.LessThan(featureAvailableInProductVersion)
+}
+
+// ReportAndLogError reports and logs the given error
+func ReportAndLogError(err error, r mb.ReporterV2, l *logp.Logger) {
+	r.Error(err)
+	l.Error(err)
 }

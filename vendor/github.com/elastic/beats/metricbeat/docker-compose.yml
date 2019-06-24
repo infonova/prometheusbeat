@@ -15,10 +15,12 @@ services:
       - ./module/apache/_meta/env
       - ./module/ceph/_meta/env
       - ./module/couchbase/_meta/env
+      - ./module/couchdb/_meta/env
       - ./module/dropwizard/_meta/env
       - ./module/elasticsearch/_meta/env
       - ./module/envoyproxy/_meta/env
       - ./module/etcd/_meta/env
+      - ./module/golang/_meta/env
       - ./module/haproxy/_meta/env
       - ./module/http/_meta/env
       - ./module/jolokia/_meta/env
@@ -30,6 +32,7 @@ services:
       - ./module/mongodb/_meta/env
       - ./module/munin/_meta/env
       - ./module/mysql/_meta/env
+      - ./module/nats/_meta/env
       - ./module/nginx/_meta/env
       - ./module/php_fpm/_meta/env
       - ./module/postgresql/_meta/env
@@ -58,6 +61,9 @@ services:
   couchbase:
     build: ./module/couchbase/_meta
 
+  couchdb:
+    build: ./module/couchdb/_meta
+
   dropwizard:
     build: ./module/dropwizard/_meta
 
@@ -75,6 +81,15 @@ services:
 
   etcd:
     build: ./module/etcd/_meta
+
+  etcd_3_2:
+    build:
+      context: ./module/etcd/_meta
+      args:
+        ETCD_VERSION: v3.2.25
+
+  golang:
+    build: ./module/golang/_meta
 
   haproxy:
     build: ./module/haproxy/_meta
@@ -98,12 +113,20 @@ services:
   kafka:
     build:
       context: ./module/kafka/_meta
-      dockerfile: Dockerfile.1.1.0
+      args:
+        KAFKA_VERSION: 2.1.1
+
+  kafka_1_1_0:
+    build:
+      context: ./module/kafka/_meta
+      args:
+        KAFKA_VERSION: 1.1.0
 
   kafka_0_10_2:
     build:
       context: ./module/kafka/_meta
-      dockerfile: Dockerfile.0.10.2
+      args:
+        KAFKA_VERSION: 0.10.2.1
 
   kibana:
     build: ./module/kibana/_meta
@@ -134,12 +157,49 @@ services:
 
   mongodb:
     build: ./module/mongodb/_meta
+    command: mongod --replSet beats
 
   munin:
     build: ./module/munin/_meta
 
   mysql:
-    build: ./module/mysql/_meta
+    build:
+      context: ./module/mysql/_meta
+      args:
+        MYSQL_IMAGE: mysql:5.7.24
+
+  mysql_8_0:
+    build:
+      context: ./module/mysql/_meta
+      args:
+        MYSQL_IMAGE: mysql:8.0.13
+
+  percona_5_7:
+    build:
+      context: ./module/mysql/_meta
+      args:
+        MYSQL_IMAGE: percona:5.7.24
+
+  percona_8_0:
+    build:
+      context: ./module/mysql/_meta
+      args:
+        MYSQL_IMAGE: percona:8.0.13-4
+
+  mariadb_10_2:
+    build:
+      context: ./module/mysql/_meta
+      args:
+        MYSQL_IMAGE: mariadb:10.2.17
+
+  mariadb_10_3:
+    build:
+      context: ./module/mysql/_meta
+      args:
+        MYSQL_IMAGE: mariadb:10.3.12
+
+  nats:
+    build: ./module/nats/_meta
 
   nginx:
     build: ./module/nginx/_meta
@@ -158,6 +218,18 @@ services:
 
   redis:
     build: ./module/redis/_meta
+
+  redis_4:
+    build:
+      context: ./module/redis/_meta
+      args:
+        REDIS_VERSION: 4.0.11
+
+  redis_5:
+    build:
+      context: ./module/redis/_meta
+      args:
+        REDIS_VERSION: 5.0-rc4
 
   traefik:
     build: ./module/traefik/_meta

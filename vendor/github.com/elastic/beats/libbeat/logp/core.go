@@ -23,6 +23,7 @@ import (
 	golog "log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"unsafe"
 
@@ -89,7 +90,7 @@ func Configure(cfg Config) error {
 	selectors := make(map[string]struct{}, len(cfg.Selectors))
 	if cfg.Level.Enabled(DebugLevel) && len(cfg.Selectors) > 0 {
 		for _, sel := range cfg.Selectors {
-			selectors[sel] = struct{}{}
+			selectors[strings.TrimSpace(sel)] = struct{}{}
 		}
 
 		// Default to all enabled if no selectors are specified.
@@ -195,6 +196,8 @@ func makeFileOutput(cfg Config) (zapcore.Core, error) {
 		file.MaxSizeBytes(cfg.Files.MaxSize),
 		file.MaxBackups(cfg.Files.MaxBackups),
 		file.Permissions(os.FileMode(cfg.Files.Permissions)),
+		file.Interval(cfg.Files.Interval),
+		file.RedirectStderr(cfg.Files.RedirectStderr),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create file rotator")

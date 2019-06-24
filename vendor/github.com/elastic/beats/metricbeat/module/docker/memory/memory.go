@@ -19,11 +19,14 @@ package memory
 
 import (
 	"github.com/docker/docker/client"
+	"github.com/pkg/errors"
 
-	"github.com/elastic/beats/libbeat/common"
+	"github.com/elastic/beats/libbeat/logp"
 	"github.com/elastic/beats/metricbeat/mb"
 	"github.com/elastic/beats/metricbeat/module/docker"
 )
+
+var logger = logp.NewLogger("docker.memory")
 
 func init() {
 	mb.Registry.MustAddMetricSet("docker", "memory", New,
@@ -32,6 +35,7 @@ func init() {
 	)
 }
 
+// MetricSet type defines all fields of the MetricSet
 type MetricSet struct {
 	mb.BaseMetricSet
 	memoryService *MemoryService
@@ -60,12 +64,21 @@ func New(base mb.BaseMetricSet) (mb.MetricSet, error) {
 }
 
 // Fetch creates a list of memory events for each container.
-func (m *MetricSet) Fetch() ([]common.MapStr, error) {
+func (m *MetricSet) Fetch(r mb.ReporterV2) {
 	stats, err := docker.FetchStats(m.dockerClient, m.Module().Config().Timeout)
 	if err != nil {
-		return nil, err
+		err = errors.Wrap(err, "failed to get docker stats")
+		logger.Error(err)
+		r.Error(err)
+		return
 	}
 
 	memoryStats := m.memoryService.getMemoryStatsList(stats, m.dedot)
-	return eventsMapping(memoryStats), nil
+	eventsMapping(r, memoryStats)
+}
+
+//Close stops the metricset
+func (m *MetricSet) Close() error {
+
+	return m.dockerClient.Close()
 }

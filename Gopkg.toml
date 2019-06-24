@@ -26,12 +26,7 @@
 
 [[constraint]]
   name = "github.com/elastic/beats"
-  version = "v6.4.1"
-
-# libbeat uses and older version of this library (transitive dep)
-[[override]]
-  name = "github.com/rcrowley/go-metrics"
-  revision = "4b2ddcb0bf13dce7963e46b97826d2695ed2f614"
+  version = "v7.1.1"
 
 [[constraint]]
   name = "github.com/golang/protobuf"
@@ -47,7 +42,7 @@
 
 [[constraint]]
   name = "github.com/prometheus/prometheus"
-  version = "2.4.2"
+  version = "2.10.0"
 
 [prune]
   go-tests = true

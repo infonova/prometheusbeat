@@ -18,56 +18,78 @@
 package mapval
 
 import (
-	"strings"
+	"reflect"
 
 	"github.com/elastic/beats/libbeat/common"
 )
 
 type walkObserverInfo struct {
-	key        string
-	value      interface{}
-	currentMap common.MapStr
-	rootMap    common.MapStr
-	path       []string
-	dottedPath string
+	key     pathComponent
+	value   interface{}
+	rootMap common.MapStr
+	path    path
 }
 
 // walkObserver functions run once per object in the tree.
-type walkObserver func(info walkObserverInfo)
+type walkObserver func(info walkObserverInfo) error
 
 // walk is a shorthand way to walk a tree.
-func walk(m common.MapStr, wo walkObserver) {
-	walkFull(m, m, []string{}, wo)
+func walk(m common.MapStr, expandPaths bool, wo walkObserver) error {
+	return walkFullMap(m, m, path{}, expandPaths, wo)
 }
 
-// walkFull walks the given MapStr tree.
-// TODO: Handle slices/arrays. We intentionally don't handle list types now because we don't need it (yet)
-// and it isn't clear in the context of validation what the right thing is to do there beyond letting the user
-// perform a custom validation
-func walkFull(m common.MapStr, root common.MapStr, path []string, wo walkObserver) {
-	for k, v := range m {
-		splitK := strings.Split(k, ".")
-		newPath := make([]string, len(path)+len(splitK))
-		copy(newPath, path)
-		copy(newPath[len(path):], splitK)
+func walkFull(o interface{}, root common.MapStr, path path, expandPaths bool, wo walkObserver) (err error) {
+	lastPathComponent := path.last()
+	if lastPathComponent == nil {
+		panic("Attempted to traverse an empty path in mapval.walkFull, this should never happen.")
+	}
 
-		dottedPath := strings.Join(newPath, ".")
+	err = wo(walkObserverInfo{*lastPathComponent, o, root, path})
+	if err != nil {
+		return err
+	}
 
-		wo(walkObserverInfo{k, v, m, root, newPath, dottedPath})
-
-		// Walk nested maps
-		vIsMap := false
-		var mapV common.MapStr
-		if convertedMS, ok := v.(common.MapStr); ok {
-			mapV = convertedMS
-			vIsMap = true
-		} else if convertedM, ok := v.(Map); ok {
-			mapV = common.MapStr(convertedM)
-			vIsMap = true
+	switch reflect.TypeOf(o).Kind() {
+	case reflect.Map:
+		converted := interfaceToMapStr(o)
+		err := walkFullMap(converted, root, path, expandPaths, wo)
+		if err != nil {
+			return err
 		}
+	case reflect.Slice:
+		converted := sliceToSliceOfInterfaces(o)
 
-		if vIsMap {
-			walkFull(mapV, root, newPath, wo)
+		for idx, v := range converted {
+			newPath := path.extendSlice(idx)
+			err := walkFull(v, root, newPath, expandPaths, wo)
+			if err != nil {
+				return err
+			}
 		}
 	}
+
+	return nil
+}
+
+// walkFullMap walks the given MapStr tree.
+func walkFullMap(m common.MapStr, root common.MapStr, p path, expandPaths bool, wo walkObserver) (err error) {
+	for k, v := range m {
+		var newPath path
+		if !expandPaths {
+			newPath = p.extendMap(k)
+		} else {
+			additionalPath, err := parsePath(k)
+			if err != nil {
+				return err
+			}
+			newPath = p.concat(additionalPath)
+		}
+
+		err = walkFull(v, root, newPath, expandPaths, wo)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
