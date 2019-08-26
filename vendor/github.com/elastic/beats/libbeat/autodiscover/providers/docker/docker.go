@@ -71,7 +71,7 @@ func AutodiscoverBuilder(bus bus.Bus, uuid uuid.UUID, c *common.Config) (autodis
 		return nil, err
 	}
 
-	builders, err := autodiscover.NewBuilders(config.Builders, config.HintsEnabled)
+	builders, err := autodiscover.NewBuilders(config.Builders, config.Hints)
 	if err != nil {
 		return nil, err
 	}

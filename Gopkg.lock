@@ -142,11 +142,10 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:0398829fe7f3807f7b7da5c4893e2c97e2720b40827f1871eb452ef530fc1032"
+  digest = "1:d2d89e94e2f1893708201307103f14cc8c7efeec3193bd2f5f27aac24e904d71"
   name = "github.com/elastic/beats"
   packages = [
     "dev-tools/mage",
-    "filebeat/generator",
     "libbeat/api",
     "libbeat/asset",
     "libbeat/autodiscover",
@@ -174,6 +173,7 @@
     "libbeat/common/docker",
     "libbeat/common/dtfmt",
     "libbeat/common/file",
+    "libbeat/common/flowhash",
     "libbeat/common/fmtstr",
     "libbeat/common/jsontransform",
     "libbeat/common/kafka",
@@ -197,6 +197,7 @@
     "libbeat/logp",
     "libbeat/logp/configure",
     "libbeat/management",
+    "libbeat/mapping",
     "libbeat/metric/system/cpu",
     "libbeat/metric/system/host",
     "libbeat/metric/system/memory",
@@ -227,9 +228,16 @@
     "libbeat/processors/add_host_metadata",
     "libbeat/processors/add_kubernetes_metadata",
     "libbeat/processors/add_locale",
+    "libbeat/processors/add_observer_metadata",
     "libbeat/processors/add_process_metadata",
+    "libbeat/processors/checks",
+    "libbeat/processors/communityid",
+    "libbeat/processors/convert",
     "libbeat/processors/dissect",
     "libbeat/processors/dns",
+    "libbeat/processors/extract_array",
+    "libbeat/processors/timeseries",
+    "libbeat/processors/util",
     "libbeat/publisher",
     "libbeat/publisher/includes",
     "libbeat/publisher/pipeline",
@@ -243,8 +251,8 @@
     "libbeat/version",
   ]
   pruneopts = "T"
-  revision = "3358d9a5a09e3c6709a2d3aaafde628ea34e8419"
-  version = "v7.1.1"
+  revision = "a4be71b90ce3e3b8213b616adfcd9e455513da45"
+  version = "v7.3.1"
 
 [[projects]]
   digest = "1:999a361511c9c6e735d8d85c81d07a7bc9dba34321e92c959708f31096b0f24d"
@@ -612,6 +620,14 @@
   version = "v0.8.1"
 
 [[projects]]
+  digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
+  name = "github.com/pmezard/go-difflib"
+  packages = ["difflib"]
+  pruneopts = "UT"
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:403b810b43500b5b0a9a24a47347e31dc2783ccae8cf97c891b46f5b0496fa1a"
   name = "github.com/prometheus/procfs"
   packages = [
@@ -653,6 +669,14 @@
   pruneopts = "UT"
   revision = "298182f68c66c05229eb03ac171abe6e309ee79a"
   version = "v1.0.3"
+
+[[projects]]
+  digest = "1:8548c309c65a85933a625be5e7d52b6ac927ca30c56869fae58123b8a77a75e1"
+  name = "github.com/stretchr/testify"
+  packages = ["assert"]
+  pruneopts = "UT"
+  revision = "221dbe5ed46703ee255b1da0dec05086f5035f62"
+  version = "v1.4.0"
 
 [[projects]]
   digest = "1:d7b2d6ad2a9768bb5c9e3bfa4d9ceaa635ca2737cca288507986f116fa4b8da2"
@@ -865,6 +889,7 @@
     "github.com/elastic/beats/libbeat/asset",
     "github.com/elastic/beats/libbeat/beat",
     "github.com/elastic/beats/libbeat/cmd",
+    "github.com/elastic/beats/libbeat/cmd/instance",
     "github.com/elastic/beats/libbeat/common",
     "github.com/elastic/beats/libbeat/logp",
     "github.com/golang/protobuf/proto",
@@ -873,6 +898,7 @@
     "github.com/magefile/mage/mg",
     "github.com/magefile/mage/sh",
     "github.com/prometheus/prometheus/prompb",
+    "github.com/stretchr/testify/assert",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

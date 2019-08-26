@@ -34,7 +34,7 @@ class Test(metricbeat.BaseTest):
         self.assertEqual(len(output), 1)
         evt = output[0]
 
-        self.assertItemsEqual(self.de_dot(MYSQL_FIELDS), evt.keys())
+        self.assertItemsEqual(self.de_dot(MYSQL_FIELDS), evt.keys(), evt)
 
         status = evt["mysql"]["status"]
         assert status["connections"] > 0
@@ -43,10 +43,9 @@ class Test(metricbeat.BaseTest):
         self.assert_fields_are_documented(evt)
 
     def get_hosts(self):
-        return ['root:test@tcp({}:3306)/'.format(self.compose_hosts()[0])]
+        return ['root:test@tcp({})/'.format(self.compose_host())]
 
 
-@unittest.skip("Flaky test, see https://github.com/elastic/beats/issues/10608")
 class TestMysql80(Test):
     COMPOSE_SERVICES = ['mysql_8_0']
 
@@ -55,7 +54,6 @@ class TestPercona57(Test):
     COMPOSE_SERVICES = ['percona_5_7']
 
 
-@unittest.skip("Flaky test, see https://github.com/elastic/beats/issues/10608")
 class TestPercona80(Test):
     COMPOSE_SERVICES = ['percona_8_0']
 
@@ -66,3 +64,7 @@ class TestMariadb102(Test):
 
 class TestMariadb103(Test):
     COMPOSE_SERVICES = ['mariadb_10_3']
+
+
+class TestMariadb104(Test):
+    COMPOSE_SERVICES = ['mariadb_10_4']

@@ -35,11 +35,13 @@ import (
 	"text/template"
 
 	errw "github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/common/cfgwarn"
 	"github.com/elastic/beats/libbeat/logp"
 	mlimporter "github.com/elastic/beats/libbeat/ml-importer"
+	"github.com/elastic/beats/libbeat/paths"
 )
 
 // Fileset struct is the representation of a fileset.
@@ -351,6 +353,20 @@ func (fs *Fileset) getInputConfig() (*common.Config, error) {
 		return nil, fmt.Errorf("Error reading input config: %v", err)
 	}
 
+	// Additional default settings, that must be available for variable expansion.
+	defaults := common.MustNewConfigFrom(map[string]interface{}{
+		"path": map[string]interface{}{
+			"home":   paths.Paths.Home,
+			"config": "${path.home}",
+			"data":   fmt.Sprint("${path.home}", string(os.PathSeparator), "data"),
+			"logs":   fmt.Sprint("${path.home}", string(os.PathSeparator), "logs"),
+		},
+	})
+
+	if err := cfg.Merge(defaults); err != nil {
+		return nil, err
+	}
+
 	// overrides
 	if len(fs.fcfg.Input) > 0 {
 		overrides, err := common.NewConfigFrom(fs.fcfg.Input)
@@ -421,15 +437,28 @@ func (fs *Fileset) GetPipelines(esVersion common.Version) (pipelines []pipeline,
 			return nil, fmt.Errorf("Error reading pipeline file %s: %v", path, err)
 		}
 
-		jsonString, err := applyTemplate(vars, string(strContents), true)
+		encodedString, err := applyTemplate(vars, string(strContents), true)
 		if err != nil {
 			return nil, fmt.Errorf("Error interpreting the template of the ingest pipeline: %v", err)
 		}
 
 		var content map[string]interface{}
-		err = json.Unmarshal([]byte(jsonString), &content)
-		if err != nil {
-			return nil, fmt.Errorf("Error JSON decoding the pipeline file: %s: %v", path, err)
+		switch extension := strings.ToLower(filepath.Ext(path)); extension {
+		case ".json":
+			if err = json.Unmarshal([]byte(encodedString), &content); err != nil {
+				return nil, fmt.Errorf("Error JSON decoding the pipeline file: %s: %v", path, err)
+			}
+		case ".yaml", ".yml":
+			if err = yaml.Unmarshal([]byte(encodedString), &content); err != nil {
+				return nil, fmt.Errorf("Error YAML decoding the pipeline file: %s: %v", path, err)
+			}
+			newContent, err := fixYAMLMaps(content)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to sanitize the YAML pipeline file: %s: %v", path, err)
+			}
+			content = newContent.(map[string]interface{})
+		default:
+			return nil, fmt.Errorf("Unsupported extension '%s' for pipeline file: %s", extension, path)
 		}
 
 		pipelineID := fs.pipelineIDs[idx]
@@ -442,6 +471,40 @@ func (fs *Fileset) GetPipelines(esVersion common.Version) (pipelines []pipeline,
 	}
 
 	return pipelines, nil
+}
+
+// This function recursively converts maps with interface{} keys, as returned by
+// yaml.Unmarshal, to maps of string keys, as expected by the json encoder
+// that will be used when delivering the pipeline to Elasticsearch.
+// Will return an error when something other than a string is used as a key.
+func fixYAMLMaps(elem interface{}) (_ interface{}, err error) {
+	switch v := elem.(type) {
+	case map[interface{}]interface{}:
+		result := make(map[string]interface{}, len(v))
+		for key, value := range v {
+			keyS, ok := key.(string)
+			if !ok {
+				return nil, fmt.Errorf("key '%v' is not string but %T", key, key)
+			}
+			if result[keyS], err = fixYAMLMaps(value); err != nil {
+				return nil, err
+			}
+		}
+		return result, nil
+	case map[string]interface{}:
+		for key, value := range v {
+			if v[key], err = fixYAMLMaps(value); err != nil {
+				return nil, err
+			}
+		}
+	case []interface{}:
+		for idx, value := range v {
+			if v[idx], err = fixYAMLMaps(value); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return elem, nil
 }
 
 // formatPipelineID generates the ID to be used for the pipeline ID in Elasticsearch

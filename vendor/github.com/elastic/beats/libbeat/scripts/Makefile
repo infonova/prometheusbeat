@@ -51,7 +51,7 @@ GOIMPORTS=goimports
 GOIMPORTS_REPO?=github.com/elastic/beats/vendor/golang.org/x/tools/cmd/goimports
 GOIMPORTS_LOCAL_PREFIX?=github.com/elastic
 GOLINT=golint
-GOLINT_REPO?=github.com/golang/lint/golint
+GOLINT_REPO?=golang.org/x/lint/golint
 REVIEWDOG?=reviewdog -conf ${ES_BEATS}/reviewdog.yml
 REVIEWDOG_OPTIONS?=-diff "git diff master"
 REVIEWDOG_REPO?=github.com/haya14busa/reviewdog/cmd/reviewdog
@@ -101,6 +101,7 @@ include $(ES_BEATS)/dev-tools/make/mage.mk
 
 ### BUILDING ###
 
+.DEFAULT_GOAL := ${BEAT_NAME}
 
 ${BEAT_NAME}: $(GOFILES_ALL) ## @build build the beat application
 	go build $(GOBUILD_FLAGS)
@@ -128,15 +129,15 @@ check: check-headers python-env prepare-tests ## @build Checks project and sourc
 	@${FIND} -wholename "*tests/system/test_*.py" -perm ${PERM_EXEC} -exec false {} + || (echo "Python test files shouldn't be executable, otherwise nose doesn't find them" && false)
 	@${FIND} -name "*.yml" -perm ${PERM_EXEC} -exec false {} + || (echo "YAML files should not be executable" && false)
 
-.PHONY: check-headers
-check-headers:
+.PHONY: $(.OVER)check-headers
+$(.OVER)check-headers:
 ifndef CHECK_HEADERS_DISABLED
 	@go get -u github.com/elastic/go-licenser
 	@go-licenser -d -license ${LICENSE}
 endif
 
-.PHONY: add-headers
-add-headers:
+.PHONY: $(.OVER)add-headers
+$(.OVER)add-headers:
 ifndef CHECK_HEADERS_DISABLED
 	@go get github.com/elastic/go-licenser
 	@go-licenser -license ${LICENSE}
@@ -320,28 +321,14 @@ coverage-report:
 fields: mage
 	@mage fields
 
+.PHONY: config
+config: mage
+	@mage config
+
 ifndef EXCLUDE_COMMON_UPDATE_TARGET
 .PHONY: update
-update: python-env fields collect ## @build Update expects the most recent version of libbeat in the GOPATH
+update: python-env fields collect config ## @build Update expects the most recent version of libbeat in the GOPATH
 	@echo "Updating generated files for ${BEAT_NAME}"
-
-	@mkdir -p _meta
-	@# Update config files.
-	@cat _meta/beat.yml ${ES_BEATS}/libbeat/_meta/config.yml | sed -e "s/beatname/${BEAT_NAME}/g;s/beat-index-prefix/${BEAT_INDEX_PREFIX}/g" > ${BEAT_NAME}.yml
-ifneq (,$(wildcard _meta/beat.docker.yml))
-	@cat _meta/beat.docker.yml ${ES_BEATS}/libbeat/_meta/config.docker.yml > ${BEAT_NAME}.docker.yml
-	@chmod 0640 ${BEAT_NAME}.yml ${BEAT_NAME}.docker.yml
-endif
-
-	@# Update reference config files.
-ifeq ($(BEAT_REF_YAML),true)
-	@if [ -e _meta/beat.reference.yml ]; then \
-      cat _meta/beat.reference.yml ${ES_BEATS}/libbeat/_meta/config.reference.yml | sed -e "s/beatname/${BEAT_NAME}/g;s/beat-index-prefix/${BEAT_INDEX_PREFIX}/g" > ${BEAT_NAME}.reference.yml ; \
-  else \
-      cat _meta/beat.yml ${ES_BEATS}/libbeat/_meta/config.reference.yml | sed -e "s/beatname/${BEAT_NAME}/g;s/beat-index-prefix/${BEAT_INDEX_PREFIX}/g" > ${BEAT_NAME}.reference.yml ; \
-  fi;
-	@chmod 0640 ${BEAT_NAME}.reference.yml
-endif
 
 ifneq ($(shell [[ $(BEAT_NAME) == libbeat || $(BEAT_NAME) == metricbeat ]] && echo true ),true)
 	mkdir -p include
@@ -364,7 +351,7 @@ endif
 endif
 
 .PHONY: docs
-docs:  ## @build Builds the documents for the beat
+docs:  ## @build Builds the documentation for the beat
 	@if [ -d $(XPACK_DIR) ]; then \
 		sh ${ES_BEATS}/script/build_docs.sh ${BEAT_NAME} ${BEAT_PATH}/docs ${BUILD_DIR} ${XPACK_DIR}; \
 	else \
@@ -372,15 +359,15 @@ docs:  ## @build Builds the documents for the beat
 	fi
 
 .PHONY: docs-preview
-docs-preview:  ## @build Preview the documents for the beat in the browser
+docs-preview:  ## @build Previews the documentation for the beat in the browser
 	PREVIEW=1 $(MAKE) docs
 
 ### SETUP commands ###
 ES_URL?=http://localhost:9200
 KIBANA_URL?=http://localhost:5601
 
-.PHONY: import-dashboards
-import-dashboards: update ${BEAT_NAME}
+.PHONY: $(.OVER)import-dashboards
+$(.OVER)import-dashboards: update ${BEAT_NAME}
 	${BEAT_GOPATH}/src/${BEAT_PATH}/${BEAT_NAME} setup -E setup.dashboards.directory=${PWD}/_meta/kibana.generated -E setup.kibana.host=${KIBANA_URL} --dashboards
 
 ### CONTAINER ENVIRONMENT ####

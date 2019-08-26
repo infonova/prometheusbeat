@@ -9,11 +9,9 @@
                         "highlightAll": true,
                         "index": "filebeat-*",
                         "query": {
-                            "query_string": {
-                                "analyze_wildcard": true,
+                            "language": "kuery",
                                 "query": "system.auth.ssh.event:Accepted"
                             }
-                        }
                     }
                 },
                 "title": "Successful SSH logins [Filebeat System] ECS",
@@ -169,11 +167,9 @@
                         "highlightAll": true,
                         "index": "filebeat-*",
                         "query": {
-                            "query_string": {
-                                "analyze_wildcard": true,
+                            "language": "kuery",
                                 "query": "system.auth.ssh.event:Failed OR system.auth.ssh.event:Invalid"
                             }
-                        }
                     }
                 },
                 "title": "SSH users of failed login attempts [Filebeat System] ECS",
@@ -225,11 +221,9 @@
                         "highlightAll": true,
                         "index": "filebeat-*",
                         "query": {
-                            "query_string": {
-                                "analyze_wildcard": true,
+                            "language": "kuery",
                                 "query": "system.auth.ssh.event:Failed OR system.auth.ssh.event:Invalid"
                             }
-                        }
                     }
                 },
                 "title": "SSH failed login attempts source locations [Filebeat System] ECS",
@@ -316,10 +310,8 @@
                         "highlightAll": true,
                         "index": "filebeat-*",
                         "query": {
-                            "query_string": {
-                                "analyze_wildcard": true,
-                                "query": "event.dataset:system.auth AND _exists_:system.auth.ssh.event"
-                            }
+                            "language": "kuery",
+                            "query": "event.dataset:system.auth AND system.auth.ssh.event:*"
                         }
                     }
                 },
@@ -366,13 +358,8 @@
                         "filter": [],
                         "highlightAll": true,
                         "query": {
-                            "language": "lucene",
-                            "query": {
-                                "query_string": {
-                                    "analyze_wildcard": true,
-                                    "query": "*"
-                                }
-                            }
+                            "language": "kuery",
+                            "query": ""
                         },
                         "version": true
                     }

@@ -15,7 +15,7 @@ import (
 )
 
 // GetConfigForTest function gets aws credentials for integration tests.
-func GetConfigForTest(metricSetName string) (map[string]interface{}, string) {
+func GetConfigForTest(metricSetName string, period string) (map[string]interface{}, string) {
 	accessKeyID, okAccessKeyID := os.LookupEnv("AWS_ACCESS_KEY_ID")
 	secretAccessKey, okSecretAccessKey := os.LookupEnv("AWS_SECRET_ACCESS_KEY")
 	sessionToken, okSessionToken := os.LookupEnv("AWS_SESSION_TOKEN")
@@ -33,7 +33,7 @@ func GetConfigForTest(metricSetName string) (map[string]interface{}, string) {
 	} else {
 		config = map[string]interface{}{
 			"module":            "aws",
-			"period":            "300s",
+			"period":            period,
 			"metricsets":        []string{metricSetName},
 			"access_key_id":     accessKeyID,
 			"secret_access_key": secretAccessKey,
@@ -76,15 +76,15 @@ func compareType(metricValue interface{}, expectedType string, metricName string
 	switch metricValue.(type) {
 	case float64:
 		if expectedType != "float" {
-			err = errors.New("Failed: Field " + metricName + "is not in type " + expectedType)
+			err = errors.New("Failed: Field " + metricName + " is not in type " + expectedType)
 		}
 	case string:
 		if expectedType != "string" {
-			err = errors.New("Failed: Field " + metricName + "is not in type " + expectedType)
+			err = errors.New("Failed: Field " + metricName + " is not in type " + expectedType)
 		}
 	case int64:
 		if expectedType != "int" {
-			err = errors.New("Failed: Field " + metricName + "is not in type " + expectedType)
+			err = errors.New("Failed: Field " + metricName + " is not in type " + expectedType)
 		}
 	}
 	return

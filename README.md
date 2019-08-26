@@ -27,27 +27,43 @@ Example Prometheusbeat event:
 
 ```
 {
-  "@timestamp": "2018-09-28T11:44:07.006Z",
+  "@timestamp": "2019-08-26T11:34:04.253Z",
   "@metadata": {
     "beat": "prometheusbeat",
-    "type": "doc",
-    "version": "6.4.1"
+    "type": "_doc",
+    "version": "7.3.1"
   },
   "labels": {
-    "le": "10",
-    "name": "prometheus_tsdb_tombstone_cleanup_seconds_bucket",
     "instance": "localhost:9090",
     "job": "prometheus"
   },
-  "value": 0,
-  "host": {
-    "name": "example.com"
+  "ecs": {
+    "version": "1.0.1"
   },
-  "beat": {
-    "version": "6.4.1",
-    "name": "prometheusbeat",
-    "hostname": "example.com"
-  }
+  "host": {
+    "containerized": false,
+    "hostname": "test",
+    "architecture": "x86_64",
+    "os": {
+      "kernel": "4.14.14-1.el7.elrepo.x86_64",
+      "codename": "Core",
+      "platform": "centos",
+      "version": "7 (Core)",
+      "family": "redhat",
+      "name": "CentOS Linux"
+    },
+    "id": "338bc9f83bf343dfa1983fc2bc43bd0f",
+    "name": "test"
+  },
+  "agent": {
+    "version": "7.3.1",
+    "type": "prometheusbeat",
+    "ephemeral_id": "51cadc55-5746-4ad2-a278-b0dcac12942b",
+    "hostname": "bhois.station",
+    "id": "f9c5188e-a1ea-4fbb-adf6-8494f56c59bf"
+  },
+  "name": "scrape_series_added",
+  "value": 349
 }
 ```
 

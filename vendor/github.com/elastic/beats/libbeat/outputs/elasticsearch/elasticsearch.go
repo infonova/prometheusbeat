@@ -20,6 +20,7 @@ package elasticsearch
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"sync"
 
 	"github.com/gofrs/uuid"
@@ -54,7 +55,7 @@ var (
 // Callbacks must not depend on the result of a previous one,
 // because the ordering is not fixed.
 type callbacksRegistry struct {
-	callbacks map[uuid.UUID]connectCallback
+	callbacks map[uuid.UUID]ConnectCallback
 	mutex     sync.Mutex
 }
 
@@ -66,7 +67,7 @@ var connectCallbackRegistry = newCallbacksRegistry()
 var globalCallbackRegistry = newCallbacksRegistry()
 
 // RegisterGlobalCallback register a global callbacks.
-func RegisterGlobalCallback(callback connectCallback) (uuid.UUID, error) {
+func RegisterGlobalCallback(callback ConnectCallback) (uuid.UUID, error) {
 	globalCallbackRegistry.mutex.Lock()
 	defer globalCallbackRegistry.mutex.Unlock()
 
@@ -88,14 +89,14 @@ func RegisterGlobalCallback(callback connectCallback) (uuid.UUID, error) {
 
 func newCallbacksRegistry() callbacksRegistry {
 	return callbacksRegistry{
-		callbacks: make(map[uuid.UUID]connectCallback),
+		callbacks: make(map[uuid.UUID]ConnectCallback),
 	}
 }
 
 // RegisterConnectCallback registers a callback for the elasticsearch output
 // The callback is called each time the client connects to elasticsearch.
 // It returns the key of the newly added callback, so it can be deregistered later.
-func RegisterConnectCallback(callback connectCallback) (uuid.UUID, error) {
+func RegisterConnectCallback(callback ConnectCallback) (uuid.UUID, error) {
 	connectCallbackRegistry.mutex.Lock()
 	defer connectCallbackRegistry.mutex.Unlock()
 
@@ -163,12 +164,15 @@ func makeES(
 		return outputs.Fail(err)
 	}
 
-	proxyURL, err := parseProxyURL(config.ProxyURL)
-	if err != nil {
-		return outputs.Fail(err)
-	}
-	if proxyURL != nil {
-		logp.Info("Using proxy URL: %s", proxyURL)
+	var proxyURL *url.URL
+	if !config.ProxyDisable {
+		proxyURL, err := parseProxyURL(config.ProxyURL)
+		if err != nil {
+			return outputs.Fail(err)
+		}
+		if proxyURL != nil {
+			logp.Info("Using proxy URL: %s", proxyURL)
+		}
 	}
 
 	params := config.Params
@@ -190,6 +194,7 @@ func makeES(
 			Index:            index,
 			Pipeline:         pipeline,
 			Proxy:            proxyURL,
+			ProxyDisable:     config.ProxyDisable,
 			TLS:              tlsConfig,
 			Username:         config.Username,
 			Password:         config.Password,
@@ -283,12 +288,15 @@ func NewElasticsearchClients(cfg *common.Config) ([]Client, error) {
 		return nil, err
 	}
 
-	proxyURL, err := parseProxyURL(config.ProxyURL)
-	if err != nil {
-		return nil, err
-	}
-	if proxyURL != nil {
-		logp.Info("Using proxy URL: %s", proxyURL)
+	var proxyURL *url.URL
+	if !config.ProxyDisable {
+		proxyURL, err := parseProxyURL(config.ProxyURL)
+		if err != nil {
+			return nil, err
+		}
+		if proxyURL != nil {
+			logp.Info("Using proxy URL: %s", proxyURL)
+		}
 	}
 
 	params := config.Params
@@ -307,6 +315,7 @@ func NewElasticsearchClients(cfg *common.Config) ([]Client, error) {
 		client, err := NewClient(ClientSettings{
 			URL:              esURL,
 			Proxy:            proxyURL,
+			ProxyDisable:     config.ProxyDisable,
 			TLS:              tlsConfig,
 			Username:         config.Username,
 			Password:         config.Password,

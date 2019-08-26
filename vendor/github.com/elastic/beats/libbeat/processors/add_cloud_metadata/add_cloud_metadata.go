@@ -52,7 +52,7 @@ var debugf = logp.MakeDebug("filters")
 
 // init registers the add_cloud_metadata processor.
 func init() {
-	processors.RegisterPlugin("add_cloud_metadata", newCloudMetadata)
+	processors.RegisterPlugin("add_cloud_metadata", New)
 }
 
 type schemaConv func(m map[string]interface{}) common.MapStr
@@ -302,7 +302,8 @@ func setupFetchers(c *common.Config) ([]*metadataFetcher, error) {
 	return fetchers, nil
 }
 
-func newCloudMetadata(c *common.Config) (processors.Processor, error) {
+// New constructs a new add_cloud_metadata processor.
+func New(c *common.Config) (processors.Processor, error) {
 	config := struct {
 		Timeout   time.Duration `config:"timeout"`   // Amount of time to wait for responses from the metadata services.
 		Overwrite bool          `config:"overwrite"` // Overwrite if cloud.* fields already exist.
