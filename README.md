@@ -59,7 +59,7 @@ Example Prometheusbeat event:
     "version": "7.3.1",
     "type": "prometheusbeat",
     "ephemeral_id": "51cadc55-5746-4ad2-a278-b0dcac12942b",
-    "hostname": "bhois.station",
+    "hostname": "test",
     "id": "f9c5188e-a1ea-4fbb-adf6-8494f56c59bf"
   },
   "name": "scrape_series_added",
