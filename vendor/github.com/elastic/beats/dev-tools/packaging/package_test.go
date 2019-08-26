@@ -402,7 +402,7 @@ func checkDockerLabels(t *testing.T, p *packageFile, info *dockerInfo, file stri
 		return
 	}
 	t.Run(fmt.Sprintf("%s labels", p.Name), func(t *testing.T) {
-		expectedLicense := "Elastic License"
+		expectedLicense := "ASL 2.0"
 		ossPrefix := strings.Join([]string{
 			info.Config.Labels["org.label-schema.name"],
 			"oss",
