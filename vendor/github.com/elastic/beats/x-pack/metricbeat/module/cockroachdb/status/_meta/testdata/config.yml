@@ -1,3 +1,0 @@
-type: http
-url: "/_status/vars"
-suffix: plain

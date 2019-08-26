@@ -1,5 +1,5 @@
-BEAT_NAME=testbeat
-BEAT_PATH=github.com/infonova/testbeat
+BEAT_NAME=prometheusbeat
+BEAT_PATH=github.com/infonova/prometheusbeat
 BEAT_GOPATH=$(firstword $(subst :, ,${GOPATH}))
 SYSTEM_TESTS=false
 TEST_ENVIRONMENT=false

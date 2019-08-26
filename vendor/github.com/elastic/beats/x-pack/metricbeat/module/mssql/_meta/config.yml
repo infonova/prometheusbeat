@@ -1,7 +1,0 @@
-- module: mssql
-  metricsets:
-    - "transaction_log"
-    - "performance"
-  hosts: ["sqlserver://sa@localhost"]
-  period: 10s
-
