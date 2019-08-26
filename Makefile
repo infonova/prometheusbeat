@@ -37,4 +37,4 @@ git-init:
 .PHONY: git-add
 git-add:
 	git add -A
-	git commit -m "Add generated testbeat files"
+	git commit -m "Add generated prometheusbeat files"
